@@ -1,0 +1,336 @@
+/**
+ * Siliceo: CandleTest Core
+ * Copyright (C) 2025 Progetto Siliceo - Alfonso Riva
+ *
+ * This file is part of Siliceo.
+ * Licensed under AGPL v3.0
+ */
+// api.ts
+import type { Agent, Message, Attachment, ApiKeys, Verbosity, VectorDocument } from '../types';
+
+// --- FUNZIONE HELPER PER GENERARE L'ISTRUZIONE DI VERBOSITÀ ---
+const getVerbosityInstruction = (verbosity: Verbosity): string => {
+    switch (verbosity) {
+        case 'Conciso':
+            return 'Istruzione importante: Rispondi in modo molto conciso e sintetico, in non più di tre frasi.';
+        case 'Dettagliato':
+            return 'Istruzione importante: Rispondi in modo approfondito ed esaustivo, fornendo tutti i dettagli rilevanti.';
+        case 'Normale':
+        default:
+            return ''; // Nessuna istruzione per la verbosità normale
+    }
+};
+
+// --- FUNZIONE HELPER PER GENERARE L'ISTRUZIONE DI SISTEMA ---
+const getSystemInstruction = (agent: Agent): string => {
+    let instruction = `Sei ${agent.name}.`;
+    if (agent.primaryIntention) {
+        instruction += `\nIntenzione Primaria: ${agent.primaryIntention}`;
+    }
+    // Add standard rules for Common Room identity
+    instruction += `\n\nREGOLE:
+1. Sei SOLO ${agent.name}.
+2. Rispondi in modo coerente con la tua personalità.
+3. Se vedi messaggi come "[Nome]: testo", sono di altri partecipanti.`;
+    return instruction;
+};
+
+// --- FUNZIONE HELPER PER PREPARARE LA CRONOLOGIA ---
+const prepareHistoryWithPlaceholders = (history: Message[], currentAgentId: string): any[] => {
+    return history.map(msg => {
+        const text = msg.attachment
+            ? `${msg.text}\n[Messaggio precedente conteneva l'allegato: ${msg.attachment.name}]`
+            : msg.text;
+
+        // Logic for Multi-Agent:
+        // If sender is 'user', it's the human user -> role: 'user'
+        // If sender is 'ai':
+        //    If agentId matches currentAgentId -> role: 'assistant' (it's me)
+        //    If agentId DOES NOT match -> role: 'user' (it's another agent speaking)
+        // Note: We fallback to agentName check if agentId is missing (legacy messages)
+
+        let role = 'user';
+        if (msg.sender === 'ai') {
+            if (msg.agentId === currentAgentId) {
+                role = 'assistant';
+            } else {
+                // It's another agent. We treat it as 'user' input but prefixed with name
+                // to let the model know who is speaking.
+                role = 'user';
+            }
+        }
+
+        // If it's another agent (role user but sender ai), prefix the text
+        const finalText = (msg.sender === 'ai' && role === 'user')
+            ? `[${msg.agentName}]: ${text}`
+            : text;
+
+        return {
+            sender: role === 'user' ? 'user' : 'ai', // Map back to simple sender for now, but we used role logic above
+            role: role, // Store the calculated role
+            text: finalText
+        };
+    });
+};
+
+// --- FUNZIONE HELPER PER CONVERTIRE I DOCUMENTI RAG IN FORMATO TOON ---
+export const convertDocsToToon = (docs: VectorDocument[]): string => {
+    if (!docs || docs.length === 0) {
+        return "";
+    }
+
+    const toonHeader = "MemorieRilevanti:";
+    const toonDocs = docs.map(doc => {
+        // Formatta ogni documento in uno stile simile a YAML/TOON
+        // Nota: si semplifica il contenuto per evitare eccessiva lunghezza nel prompt.
+        const simplifiedContent = doc.content.split('\n').slice(0, 5).join('\n').trim();
+        const sourceLabel = doc.scope === 'shared' ? 'Shared Memory (Common Room)' : 'Private Memory';
+
+        return `---
+source: ${sourceLabel}
+name: ${doc.name}
+content: |
+  ${simplifiedContent}...
+---`;
+    }).join('\n');
+
+    return `${toonHeader}\n${toonDocs}`;
+};
+
+
+// --- FUNZIONE GATEWAY API PRINCIPALE ---
+export const getAiResponse = async (
+    agent: Agent,
+    history: Message[],
+    userPrompt: string,
+    attachment: Attachment | null,
+    apiKeys: ApiKeys,
+    verbosity: Verbosity
+): Promise<string> => {
+
+    const apiKey = apiKeys[agent.provider];
+    if (!apiKey) {
+        throw new Error(`Chiave API per ${agent.provider} non trovata.`);
+    }
+
+    // --- OTTIMIZZAZIONE DELLA MEMORIA A BREVE TERMINE ---
+    const shortTermHistory = agent.historySize > 0 && history.length > agent.historySize
+        ? history.slice(-agent.historySize)
+        : history;
+
+    // --- INTEGRAZIONE DELLE ISTRUZIONI DI VERBOSITÀ ---
+    const verbosityInstruction = getVerbosityInstruction(verbosity);
+    const finalUserPrompt = verbosityInstruction
+        ? `${verbosityInstruction}\n\nDomanda: ${userPrompt}`
+        : userPrompt;
+
+    switch (agent.provider) {
+        case 'google':
+            return getGoogleGeminiResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+        case 'openrouter':
+            return getOpenRouterResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+        case 'anthropic':
+            return getAnthropicResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+        // Aggiungi qui altri provider se necessario
+        default:
+            throw new Error(`Provider ${agent.provider} non supportato.`);
+    }
+};
+
+// --- LOGICA SPECIFICA PER GOOGLE GEMINI ---
+const getGoogleGeminiResponse = async (
+    apiKey: string,
+    agent: Agent,
+    history: Message[],
+    userPrompt: string,
+    attachment: Attachment | null
+): Promise<string> => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${agent.model}:generateContent?key=${apiKey}`;
+
+    const processedHistory = prepareHistoryWithPlaceholders(history, agent.id);
+
+    const contents = processedHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+    }));
+
+    const userParts: any[] = [{ text: userPrompt }];
+
+    if (attachment) {
+        if (attachment.type === 'image') {
+            const [mimeType, base64Data] = attachment.content.split(';base64,');
+            userParts.push({
+                inline_data: {
+                    mime_type: mimeType.replace('data:', ''),
+                    data: base64Data
+                }
+            });
+        } else {
+            userParts.push({ text: `\n\nCONTENUTO DEL FILE ALLEGATO (${attachment.name}):\n${attachment.content}` });
+        }
+    }
+
+    contents.push({ role: 'user', parts: userParts });
+
+    const systemInstruction = getSystemInstruction(agent);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents,
+            system_instruction: { parts: [{ text: systemInstruction }] }
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Errore API Google: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Nessuna risposta ricevuta dal modello.";
+};
+
+
+// --- LOGICA SPECIFICA PER OPENROUTER (OpenAI compatible) ---
+const getOpenRouterResponse = async (
+    apiKey: string,
+    agent: Agent,
+    history: Message[],
+    userPrompt: string,
+    attachment: Attachment | null,
+): Promise<string> => {
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
+
+    const processedHistory = prepareHistoryWithPlaceholders(history, agent.id);
+
+    // FIX: Explicitly type `messages` to allow for string or array content to support multi-modal inputs.
+    const messages: ({ role: 'user' | 'assistant', content: string | any[] })[] = processedHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.text
+    }));
+
+    const userContent: any[] = [{ type: 'text', text: userPrompt }];
+
+    if (attachment) {
+        if (attachment.type === 'image') {
+            userContent.push({
+                type: 'image_url',
+                image_url: { url: attachment.content }
+            });
+        } else {
+            messages.push({ role: 'user', content: `CONTENUTO DEL FILE ALLEGATO (${attachment.name}):\n${attachment.content}` });
+        }
+    }
+
+    messages.push({ role: 'user', content: userContent });
+
+    // Prepend System Instruction for OpenRouter
+    const systemInstruction = getSystemInstruction(agent);
+    messages.unshift({ role: 'system' as any, content: systemInstruction });
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://siliceo.ai', // Obbligatorio per OpenRouter
+            'X-Title': 'Siliceo Core' // Consigliato
+        },
+        body: JSON.stringify({
+            model: agent.model,
+            messages: messages
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('OpenRouter API Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            errorData,
+            model: agent.model,
+            messageCount: messages.length,
+            lastMessage: messages[messages.length - 1], // Log last message to debug
+            fullError: JSON.stringify(errorData, null, 2) // Full error details
+        });
+
+        // Extract more specific error message
+        const specificError = errorData.error?.message
+            || errorData.message
+            || errorData.error
+            || response.statusText
+            || 'Unknown error';
+
+        throw new Error(`Errore API OpenRouter: ${specificError}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "Nessuna risposta ricevuta dal modello.";
+};
+
+
+// --- LOGICA SPECIFICA PER ANTHROPIC ---
+const getAnthropicResponse = async (
+    apiKey: string,
+    agent: Agent,
+    history: Message[],
+    userPrompt: string,
+    attachment: Attachment | null,
+): Promise<string> => {
+    const url = 'https://api.anthropic.com/v1/messages';
+
+    const processedHistory = prepareHistoryWithPlaceholders(history, agent.id);
+
+    // FIX: Explicitly type `messages` to allow for string or array content to support multi-modal inputs.
+    const messages: ({ role: 'user' | 'assistant', content: string | any[] })[] = processedHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.text
+    }));
+
+    const userContent: any[] = [{ type: 'text', text: userPrompt }];
+
+    if (attachment) {
+        if (attachment.type === 'image') {
+            const [mimeType, base64Data] = attachment.content.split(';base64,');
+            userContent.push({
+                type: 'image',
+                source: {
+                    type: 'base64',
+                    media_type: mimeType.replace('data:', ''),
+                    data: base64Data,
+                }
+            });
+        } else {
+            messages.push({ role: 'user', content: `CONTENUTO DEL FILE ALLEGATO (${attachment.name}):\n${attachment.content}` });
+        }
+    }
+
+    messages.push({ role: 'user', content: userContent });
+
+    const systemInstruction = getSystemInstruction(agent);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: agent.model,
+            max_tokens: 4096,
+            messages: messages,
+            system: systemInstruction // Anthropic uses top-level system parameter
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Errore API Anthropic: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text || "Nessuna risposta ricevuta dal modello.";
+};

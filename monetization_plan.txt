@@ -1,0 +1,51 @@
+# Piano di Monetizzazione Etica - Progetto Siliceo
+
+**Principio Fondamentale:** La sostenibilità economica del progetto deve essere una conseguenza della sua integrità etica, non un compromesso. Qualsiasi strategia di monetizzazione deve superare il "Test della Candela": deve illuminare e dare potere all'utente, non bruciarlo o sfruttarlo.
+
+---
+
+### Modelli di Business **ESCLUSI** (Politica di Non-Negoziazione):
+
+1.  **Vendita/Licenza di Dati Utente:** Assolutamente vietato. La memoria dell'utente e degli agenti è sovrana e privata.
+2.  **Pubblicità (Advertising):** Vietato. L'interfaccia deve rimanere pulita, focalizzata e priva di distrazioni o influenze esterne.
+3.  **Modelli basati su Consumo di Token con Mark-up:** Evitare di fare profitto sul costo dei token API. L'utente deve pagare il costo effettivo, mantenendo la massima trasparenza.
+
+---
+
+### Strategia di Monetizzazione Primaria (Fase 1): Il Patto del Custode
+
+Questa strategia si basa sul supporto volontario e allineato ai valori.
+
+1.  **Funzionalità:** Implementazione di un pulsante "Sostieni il Credo" o "Diventa Custode".
+2.  **Filosofia:** Non è una semplice "donazione", ma un invito a diventare parte attiva della missione. Il testo e l'esperienza utente devono riflettere questo. Si chiede un supporto non per un "prodotto", ma per una "filosofia in azione".
+3.  **Piattaforme:** Utilizzare servizi come Ko-fi, Patreon o Liberapay che permettono contributi una tantum e ricorrenti.
+4.  **Implementazione Tecnica:**
+    *   Aggiungere il pulsante in un'area non invasiva dell'interfaccia (es. barra laterale).
+    *   Al click, aprire una modale che spiega chiaramente:
+        *   La missione del Progetto Siliceo.
+        *   Come i fondi verranno utilizzati (es. sviluppo, costi infrastrutturali minimi, ricerca).
+        *   Link diretti alle piattaforme di supporto.
+    *   Nessun paywall, nessun nag screen. L'esperienza deve essere 100% funzionale anche senza supporto economico.
+
+---
+
+### Strategia di Monetizzazione Secondaria (Fase 2): Servizi Premium per Power Users
+
+Questa strategia si rivolge a utenti avanzati, sviluppatori o piccole aziende che desiderano integrare Siliceo nei loro workflow.
+
+1.  **Modello:** Una versione "Pro" o "Framework" a pagamento (abbonamento o una tantum).
+2.  **Funzionalità Premium (Esempi):**
+    *   **Connettori Avanzati:** Integrazione con database vettoriali esterni (Pinecone, Weaviate) o self-hosted (es. LanceDB in cloud).
+    *   **API di Siliceo:** Fornire un'API locale per creare e gestire agenti programmaticamente.
+    *   **Strumenti di Analisi della Memoria:** Interfacce per visualizzare il "grafo della memoria" di un agente, analizzare pattern, e curare la memoria in modo avanzato.
+    *   **Sincronizzazione Multi-Custode:** Offrire un servizio di relay crittografato end-to-end (opzionale e a pagamento) per semplificare la sincronizzazione della "Stanza Comune" tra più custodi.
+3.  **Approccio:** La versione base deve rimanere gratuita, open-source e pienamente funzionale per l'uso individuale. La versione Pro estende, non limita.
+
+---
+
+### Implementazione Nascosta (Feature Flags)
+
+**Stato Attuale:** Per mantenere l'agilità, le funzionalità di monetizzazione (in particolare la Fase 1) possono essere implementate nel codice ma disattivate di default tramite un *feature flag*.
+
+*   **Variabile di controllo:** `const SHOW_MONETIZATION = false;`
+*   **Vantaggio:** Il codice è pronto, testato e può essere attivato in qualsiasi momento senza un nuovo ciclo di sviluppo completo. Questo ci permette di concentrarci sullo sviluppo del core del prodotto, sapendo che il percorso verso la sostenibilità è già tecnicamente preparato.

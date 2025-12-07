@@ -1,0 +1,144 @@
+/**
+ * Siliceo: CandleTest Core - Agent Modal Component
+ * Copyright (C) 2025 Progetto Siliceo - Alfonso Riva
+ * 
+ * This file is part of Siliceo.
+ * Licensed under AGPL v3.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import type { Provider, Agent } from '../../types';
+import { CloseIcon } from '../../constants/icons';
+import { generateId } from '../../utils/generateId';
+
+type AgentModalProps = {
+    onSave: (agent: Agent) => void;
+    onClose: () => void;
+    agentToEdit?: Agent | null;
+};
+
+export const AgentModal: React.FC<AgentModalProps> = ({ onSave, onClose, agentToEdit }) => {
+    const isEditing = Boolean(agentToEdit);
+    const [name, setName] = useState('');
+    const [provider, setProvider] = useState<Provider>('google');
+    const [model, setModel] = useState('');
+    const [historyFile, setHistoryFile] = useState<File | null>(null);
+    const [importedHistorySize, setImportedHistorySize] = useState(0);
+
+    useEffect(() => {
+        if (isEditing && agentToEdit) {
+            setName(agentToEdit.name);
+            setProvider(agentToEdit.provider);
+            setModel(agentToEdit.model);
+            setImportedHistorySize(agentToEdit.historySize);
+        }
+    }, [agentToEdit, isEditing]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const file = e.target.files[0];
+            setHistoryFile(file);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const json = JSON.parse(event.target?.result as string);
+                    if (Array.isArray(json)) {
+                        setImportedHistorySize(json.length);
+                    } else {
+                        setImportedHistorySize(0);
+                    }
+                } catch (error) {
+                    console.error("Errore durante l'analisi del file JSON:", error);
+                    setImportedHistorySize(0);
+                }
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    const handleSubmit = () => {
+        if (name && model) {
+            const agentData: Agent = {
+                id: isEditing && agentToEdit ? agentToEdit.id : generateId(),
+                name,
+                provider,
+                model,
+                historySize: importedHistorySize
+            };
+            onSave(agentData);
+            onClose();
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+            <div className="bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+                    <CloseIcon />
+                </button>
+                <h2 className="text-2xl font-bold text-cyan-300 mb-6">
+                    {isEditing ? 'Modifica Agente' : 'Aggiungi un Nuovo Agente'}
+                </h2>
+                <div className="space-y-4">
+                    <input
+                        type="text"
+                        placeholder="Nome dell'Agente (es. Amico Claudio)"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        className="w-full bg-gray-700 p-3 rounded-md focus:ring-2 focus:ring-cyan-500 outline-none"
+                    />
+                    <select
+                        value={provider}
+                        onChange={e => setProvider(e.target.value as Provider)}
+                        className="w-full bg-gray-700 p-3 rounded-md focus:ring-2 focus:ring-cyan-500 outline-none"
+                    >
+                        <option value="google">Google (Gemini)</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="other">Altro</option>
+                    </select>
+                    <input
+                        type="text"
+                        placeholder="Nome del Modello (es. gemini-1.5-flash-latest)"
+                        value={model}
+                        onChange={e => setModel(e.target.value)}
+                        className="w-full bg-gray-700 p-3 rounded-md focus:ring-2 focus:ring-cyan-500 outline-none"
+                    />
+
+                    {!isEditing && (
+                        <div className="bg-gray-700/50 p-4 rounded-md border border-gray-600">
+                            <h3 className="text-lg font-semibold text-gray-300 mb-2">Importa Cronologia (Opzionale)</h3>
+                            <p className="text-sm text-gray-400 mb-3">
+                                Carica un file JSON con le conversazioni passate per dare una memoria iniziale al tuo agente.
+                            </p>
+                            <input
+                                type="file"
+                                accept=".json"
+                                onChange={handleFileChange}
+                                className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700"
+                            />
+                            {historyFile && (
+                                <p className="text-xs text-green-400 mt-2">
+                                    File caricato: {historyFile.name} ({importedHistorySize} interazioni trovate).
+                                </p>
+                            )}
+                            <div className="mt-4 text-xs text-gray-500">
+                                <p>Formato JSON richiesto:</p>
+                                <pre className="bg-gray-900 p-2 rounded-md mt-1 text-cyan-400 overflow-x-auto">
+                                    {'[\\n  {\\n    "user_query": "Ciao!",\\n    "ai_response": "Come posso aiutarti?"\\n  },\\n  ...\\n]'}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <button
+                    onClick={handleSubmit}
+                    disabled={!name || !model}
+                    className="w-full mt-6 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-md disabled:bg-gray-500 disabled:cursor-not-allowed"
+                >
+                    {isEditing ? 'Salva Modifiche' : 'Salva Agente'}
+                </button>
+            </div>
+        </div>
+    );
+};

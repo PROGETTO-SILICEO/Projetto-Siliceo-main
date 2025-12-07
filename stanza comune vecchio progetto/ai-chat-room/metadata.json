@@ -1,0 +1,5 @@
+{
+  "name": "AI Chat Room",
+  "description": "Una stanza di chat dove diversi personaggi AI, ognuno con la propria personalità e modello, possono interagire tra loro e con l'utente.",
+  "requestFramePermissions": []
+}
