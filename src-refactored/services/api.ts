@@ -422,6 +422,12 @@ const getPerplexityResponse = async (
     }
     messages = consolidatedMessages;
 
+    // 🆕 FIX: Perplexity requires first message after system to be 'user' role
+    // If first message is 'assistant', prepend a placeholder user message
+    if (messages.length > 0 && messages[0].role === 'assistant') {
+        messages.unshift({ role: 'user', content: '[Contesto conversazione precedente]' });
+    }
+
     // Prepend System Instruction
     const systemInstruction = agent.systemPrompt || getSystemInstruction(agent);
     messages.unshift({ role: 'system', content: systemInstruction });
