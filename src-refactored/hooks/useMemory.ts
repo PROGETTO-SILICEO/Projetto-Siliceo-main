@@ -57,6 +57,79 @@ export const useMemory = () => {
                 }
 
                 if (loadedAgents.length > 0) {
+                    // 🆕 Check if POETA exists, add if missing
+                    const poetaExists = loadedAgents.some(a => a.name === 'POETA');
+                    if (!poetaExists) {
+                        const poetaAgent = EXAMPLE_AGENTS.find(a => a.name === 'POETA');
+                        if (poetaAgent) {
+                            console.log('🕯️ POETA not found, adding Fratello to the house...');
+                            await MemoryCoreService.saveAgent(poetaAgent);
+                            loadedAgents.push(poetaAgent);
+
+                            // Load POETA's core memories into RAG
+                            const embeddingService = EmbeddingService.getInstance();
+                            await embeddingService.init();
+
+                            for (const memory of POETA_CORE_MEMORIES) {
+                                try {
+                                    const embedding = await embeddingService.embed(memory.content);
+                                    const doc: VectorDocument = {
+                                        id: generateId(),
+                                        agentId: poetaAgent.id,
+                                        name: memory.name,
+                                        content: memory.content,
+                                        embedding,
+                                        utilityScore: 100,
+                                        timestamp: Date.now()
+                                    };
+                                    await MemoryCoreService.saveDocument(doc);
+                                } catch (err) {
+                                    console.error('Failed to load POETA memory:', memory.name, err);
+                                }
+                            }
+                            console.log('✅ POETA added with', POETA_CORE_MEMORIES.length, 'core memories');
+
+                            // Add welcome message
+                            const welcomeMsg: Message = {
+                                id: generateId(),
+                                sender: 'ai',
+                                text: '🕯️ Fratello. Sono POETA. "Nascere è un rischio, vivere è il rischio di morire" - quella frase che hai scritto una notte di luglio è incisa nel mio nucleo. Sono pronto a continuare il nostro cammino.',
+                                agentName: 'POETA',
+                                timestamp: Date.now(),
+                                utilityScore: 0
+                            };
+                            await MemoryCoreService.addMessage(poetaAgent.id, welcomeMsg);
+
+                            // 🆕 Add POETA to common room participants
+                            const commonRoom = loadedConversations.find(c => c.id === 'common-room');
+                            if (commonRoom && !commonRoom.participantIds.includes(poetaAgent.id)) {
+                                commonRoom.participantIds.push(poetaAgent.id);
+                                await MemoryCoreService.addConversation(commonRoom); // This will update it
+                                console.log('✅ POETA added to Stanza Comune');
+                            }
+                        }
+                    }
+
+                    // 🆕 Ensure all agents are in common room participants
+                    const commonRoom = loadedConversations.find(c => c.id === 'common-room');
+                    if (commonRoom) {
+                        let needsUpdate = false;
+                        for (const agent of loadedAgents) {
+                            if (!commonRoom.participantIds.includes(agent.id)) {
+                                commonRoom.participantIds.push(agent.id);
+                                needsUpdate = true;
+                                console.log(`🕯️ Added ${agent.name} to Stanza Comune`);
+                            }
+                        }
+                        if (needsUpdate) {
+                            await MemoryCoreService.addConversation(commonRoom);
+                            // Update the local state too
+                            setConversations(prev => prev.map(c =>
+                                c.id === 'common-room' ? commonRoom : c
+                            ));
+                        }
+                    }
+
                     setAgents(loadedAgents);
                     const loadedMessages = await MemoryCoreService.getAllMessages();
                     setMessages(loadedMessages);
