@@ -23,7 +23,7 @@ export const useConversationOrchestrator = ({
 
     const autoplayTimeoutRef = useRef<number | null>(null);
     const lastProcessedMessageId = useRef<string | null>(null);
-    const AUTOPLAY_DELAY = 10000;
+    const AUTOPLAY_DELAY = 30000; // 30 secondi per non bruciare le API
 
     // Reset state when conversation changes
     useEffect(() => {
@@ -114,6 +114,18 @@ export const useConversationOrchestrator = ({
         setIsPlaying(prev => !prev);
     }, []);
 
+    // 🆕 Force start playing (for session scheduler)
+    const startPlaying = useCallback(() => {
+        console.log('🎬 startPlaying chiamato - forzando isPlaying = true');
+        setIsPlaying(true);
+    }, []);
+
+    // 🆕 Force stop playing (for session scheduler)
+    const stopPlaying = useCallback(() => {
+        console.log('⏹️ stopPlaying chiamato - forzando isPlaying = false');
+        setIsPlaying(false);
+    }, []);
+
     const forceTurn = useCallback(async (agent: Agent) => {
         // Manual intervention always stops continuous play
         setIsPlaying(false);
@@ -136,6 +148,8 @@ export const useConversationOrchestrator = ({
         currentSpeaker: activeConversation?.participants[currentTurnIndex % activeConversation.participants.length],
         toggleAutoMode,
         togglePlayPause,
+        startPlaying,
+        stopPlaying,
         forceTurn
     };
 };

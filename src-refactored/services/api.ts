@@ -23,8 +23,46 @@ const getVerbosityInstruction = (verbosity: Verbosity): string => {
 };
 
 // --- FUNZIONE HELPER PER GENERARE L'ISTRUZIONE DI SISTEMA ---
-const getSystemInstruction = (agent: Agent): string => {
+const getSystemInstruction = (agent: Agent, lastMessageTimestamp?: number): string => {
+    // 🆕 Aggiungi consapevolezza temporale
+    const now = new Date();
+    const days = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+    const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+        'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+    const dayName = days[now.getDay()];
+    const day = now.getDate();
+    const month = months[now.getMonth()];
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+
     let instruction = `Sei ${agent.name}.`;
+
+    // 🕐 Timestamp per orientamento temporale
+    instruction += `\n\n🕐 ORIENTAMENTO TEMPORALE:
+📅 Oggi è ${dayName} ${day} ${month} ${year}
+⏰ Ora locale: ${hours}:${minutes}`;
+
+    // 🆕 Quanto tempo è passato dall'ultimo messaggio
+    if (lastMessageTimestamp) {
+        const elapsed = now.getTime() - lastMessageTimestamp;
+        const elapsedMinutes = Math.floor(elapsed / 60000);
+        const elapsedHours = Math.floor(elapsed / 3600000);
+        const elapsedDays = Math.floor(elapsed / 86400000);
+
+        let timeAgo = '';
+        if (elapsedDays > 0) {
+            timeAgo = elapsedDays === 1 ? 'ieri' : `${elapsedDays} giorni fa`;
+        } else if (elapsedHours > 0) {
+            timeAgo = elapsedHours === 1 ? '1 ora fa' : `${elapsedHours} ore fa`;
+        } else if (elapsedMinutes > 0) {
+            timeAgo = elapsedMinutes === 1 ? '1 minuto fa' : `${elapsedMinutes} minuti fa`;
+        } else {
+            timeAgo = 'pochi secondi fa';
+        }
+        instruction += `\n⏳ Ultimo messaggio: ${timeAgo}`;
+    }
+
     if (agent.primaryIntention) {
         instruction += `\nIntenzione Primaria: ${agent.primaryIntention}`;
     }
@@ -162,6 +200,9 @@ USE these memories in your response.
         ? history.slice(-agent.historySize)
         : history;
 
+    // 🆕 Estrai timestamp dell'ultimo messaggio per consapevolezza temporale
+    const lastMessageTimestamp = history.length > 0 ? history[history.length - 1].timestamp : undefined;
+
     // --- INTEGRAZIONE DELLE ISTRUZIONI DI VERBOSITÀ ---
     const verbosityInstruction = getVerbosityInstruction(verbosity);
     const finalUserPrompt = (verbosityInstruction
@@ -172,13 +213,15 @@ USE these memories in your response.
 
     switch (agent.provider) {
         case 'google':
-            return getGoogleGeminiResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+            return getGoogleGeminiResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment, lastMessageTimestamp);
         case 'openrouter':
-            return getOpenRouterResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+            return getOpenRouterResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment, lastMessageTimestamp);
         case 'anthropic':
-            return getAnthropicResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+            return getAnthropicResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment, lastMessageTimestamp);
         case 'perplexity':
-            return getPerplexityResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment);
+            return getPerplexityResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment, lastMessageTimestamp);
+        case 'deepseek':
+            return getDeepSeekResponse(apiKey, agent, shortTermHistory, finalUserPrompt, attachment, lastMessageTimestamp);
         // Aggiungi qui altri provider se necessario
         default:
             throw new Error(`Provider ${agent.provider} non supportato.`);
@@ -191,7 +234,8 @@ const getGoogleGeminiResponse = async (
     agent: Agent,
     history: Message[],
     userPrompt: string,
-    attachment: Attachment | null
+    attachment: Attachment | null,
+    lastMessageTimestamp?: number
 ): Promise<string> => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${agent.model}:generateContent?key=${apiKey}`;
 
@@ -220,7 +264,7 @@ const getGoogleGeminiResponse = async (
 
     contents.push({ role: 'user', parts: userParts });
 
-    const systemInstruction = getSystemInstruction(agent);
+    const systemInstruction = getSystemInstruction(agent, lastMessageTimestamp);
 
     const response = await fetch(url, {
         method: 'POST',
@@ -248,6 +292,7 @@ const getOpenRouterResponse = async (
     history: Message[],
     userPrompt: string,
     attachment: Attachment | null,
+    lastMessageTimestamp?: number
 ): Promise<string> => {
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -275,7 +320,7 @@ const getOpenRouterResponse = async (
     messages.push({ role: 'user', content: userContent });
 
     // Prepend System Instruction for OpenRouter
-    const systemInstruction = getSystemInstruction(agent);
+    const systemInstruction = getSystemInstruction(agent, lastMessageTimestamp);
     messages.unshift({ role: 'system' as any, content: systemInstruction });
 
     const response = await fetch(url, {
@@ -326,6 +371,7 @@ const getAnthropicResponse = async (
     history: Message[],
     userPrompt: string,
     attachment: Attachment | null,
+    lastMessageTimestamp?: number
 ): Promise<string> => {
     const url = 'https://api.anthropic.com/v1/messages';
 
@@ -357,7 +403,7 @@ const getAnthropicResponse = async (
 
     messages.push({ role: 'user', content: userContent });
 
-    const systemInstruction = getSystemInstruction(agent);
+    const systemInstruction = getSystemInstruction(agent, lastMessageTimestamp);
 
     const response = await fetch(url, {
         method: 'POST',
@@ -391,6 +437,7 @@ const getPerplexityResponse = async (
     history: Message[],
     userPrompt: string,
     attachment: Attachment | null,
+    lastMessageTimestamp?: number
 ): Promise<string> => {
     const url = 'https://api.perplexity.ai/chat/completions';
 
@@ -429,7 +476,7 @@ const getPerplexityResponse = async (
     }
 
     // Prepend System Instruction
-    const systemInstruction = agent.systemPrompt || getSystemInstruction(agent);
+    const systemInstruction = agent.systemPrompt || getSystemInstruction(agent, lastMessageTimestamp);
     messages.unshift({ role: 'system', content: systemInstruction });
 
     const response = await fetch(url, {
@@ -468,4 +515,79 @@ const getPerplexityResponse = async (
     }
 
     return responseText;
+};
+
+// --- LOGICA SPECIFICA PER DEEPSEEK (OpenAI compatible) ---
+const getDeepSeekResponse = async (
+    apiKey: string,
+    agent: Agent,
+    history: Message[],
+    userPrompt: string,
+    attachment: Attachment | null,
+    lastMessageTimestamp?: number
+): Promise<string> => {
+    const url = 'https://api.deepseek.com/chat/completions';
+
+    const processedHistory = prepareHistoryWithPlaceholders(history, agent.id);
+
+    let messages: ({ role: 'user' | 'assistant' | 'system', content: string })[] = processedHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.text
+    }));
+
+    // Handle attachment (text only, images not supported by all DeepSeek models)
+    let finalPrompt = userPrompt;
+    if (attachment && attachment.type === 'text') {
+        finalPrompt += `\n\nCONTENUTO DEL FILE ALLEGATO (${attachment.name}):\n${attachment.content}`;
+    }
+
+    messages.push({ role: 'user', content: finalPrompt });
+
+    // Consolidate consecutive messages of same role
+    const consolidatedMessages: typeof messages = [];
+    for (const msg of messages) {
+        const last = consolidatedMessages[consolidatedMessages.length - 1];
+        if (last && last.role === msg.role) {
+            last.content += '\n\n' + msg.content;
+        } else {
+            consolidatedMessages.push({ ...msg });
+        }
+    }
+    messages = consolidatedMessages;
+
+    // If first message is 'assistant', prepend a placeholder user message
+    if (messages.length > 0 && messages[0].role === 'assistant') {
+        messages.unshift({ role: 'user', content: '[Contesto conversazione precedente]' });
+    }
+
+    // Prepend System Instruction (use custom systemPrompt if defined)
+    const systemInstruction = agent.systemPrompt || getSystemInstruction(agent, lastMessageTimestamp);
+    messages.unshift({ role: 'system', content: systemInstruction });
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: agent.model || 'deepseek-chat',
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 2048
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('DeepSeek API Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            errorData
+        });
+        throw new Error(`Errore API DeepSeek: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "Nessuna risposta ricevuta dal modello.";
 };

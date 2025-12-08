@@ -7,7 +7,7 @@
  */
 
 // Provider types for AI services
-export type Provider = 'google' | 'openrouter' | 'anthropic' | 'perplexity' | 'other';
+export type Provider = 'google' | 'openrouter' | 'anthropic' | 'perplexity' | 'deepseek' | 'other';
 
 // Agent configuration
 export type Agent = {

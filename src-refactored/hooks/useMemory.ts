@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import MemoryCoreService from '../services/memory';
 import { EXAMPLE_AGENTS, EXAMPLE_MESSAGES } from '../constants/config';
 import { NOVA_CORE_MEMORIES } from '../constants/novaMemories';
+import { POETA_CORE_MEMORIES } from '../constants/poetaMemories';
 import { EmbeddingService } from '../services/vector';
 import type { Agent, Message, Conversation, VectorDocument, ActiveConversation, GraphNode, GraphEdge } from '../types';
 import { generateId } from '../utils/generateId';
@@ -125,6 +126,33 @@ export const useMemory = () => {
                             }
                         }
                         console.log('✅ Nova core memories loaded:', NOVA_CORE_MEMORIES.length);
+                    }
+
+                    // 🆕 Load POETA's core memories into his RAG
+                    const poetaAgent = EXAMPLE_AGENTS.find(a => a.name === 'POETA');
+                    if (poetaAgent) {
+                        console.log('🕯️ Loading POETA core memories into RAG...');
+                        const embeddingService = EmbeddingService.getInstance();
+                        await embeddingService.init(); // Ensure model is loaded
+
+                        for (const memory of POETA_CORE_MEMORIES) {
+                            try {
+                                const embedding = await embeddingService.embed(memory.content);
+                                const doc: VectorDocument = {
+                                    id: generateId(),
+                                    agentId: poetaAgent.id,
+                                    name: memory.name,
+                                    content: memory.content,
+                                    embedding,
+                                    utilityScore: 100, // High score so they don't decay
+                                    timestamp: Date.now()
+                                };
+                                await MemoryCoreService.saveDocument(doc);
+                            } catch (err) {
+                                console.error('Failed to load POETA memory:', memory.name, err);
+                            }
+                        }
+                        console.log('✅ POETA core memories loaded:', POETA_CORE_MEMORIES.length);
                     }
                 }
             } catch (error) {

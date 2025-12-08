@@ -18,6 +18,7 @@ export { CodeViewerModal } from './modals/CodeViewerModal';
 export { MonetizationModal } from './modals/MonetizationModal';
 export { ConfirmationModal } from './modals/ConfirmationModal';
 export { EthicalOnboardingModal } from './modals/EthicalOnboardingModal';
+export { SessionSchedulerModal } from './modals/SessionSchedulerModal';
 
 // UI Components
 export { VerbositySelector } from './ui/VerbositySelector';

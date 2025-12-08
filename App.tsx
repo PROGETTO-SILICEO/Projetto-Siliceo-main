@@ -19,12 +19,11 @@ import { generateId } from './src-refactored/utils/generateId';
 import { EmbeddingService } from './src-refactored/services/vector';
 import type { Agent, Message, VectorDocument } from './src-refactored/types';
 
-// Components
 import {
   AgentModal, SettingsModal, PriceSettingsModal, CometTestimonyModal,
   FoundingStoryModal, SecurityModal, SemanticGraphModal, CodeViewerModal,
   MonetizationModal, ConfirmationModal, EthicalOnboardingModal, VerbositySelector,
-  CommonRoom
+  CommonRoom, SessionSchedulerModal
 } from './src-refactored/components';
 
 // Hooks
@@ -33,6 +32,7 @@ import { useOnboarding } from './src-refactored/hooks/useOnboarding';
 import { useMemory } from './src-refactored/hooks/useMemory';
 import { useChat } from './src-refactored/hooks/useChat';
 import { useConversationOrchestrator } from './src-refactored/hooks/useConversationOrchestrator';
+import { useSessionScheduler } from './src-refactored/hooks/useSessionScheduler';
 
 // Context
 import { ToastProvider, useToast } from './src-refactored/context/ToastContext';
@@ -326,6 +326,8 @@ const SiliceoApp: React.FC = () => {
     currentSpeaker,
     toggleAutoMode,
     togglePlayPause,
+    startPlaying,
+    stopPlaying,
     forceTurn
   } = useConversationOrchestrator({
     activeConversation: activeConversationObject,
@@ -336,6 +338,23 @@ const SiliceoApp: React.FC = () => {
       ? messages[activeConversationObject.id][messages[activeConversationObject.id].length - 1]
       : undefined
   });
+
+  // 🆕 Session Scheduler Hook
+  const sessionScheduler = useSessionScheduler({
+    sendCommonRoomMessage,
+    startPlaying,
+    stopPlaying,
+    isPlaying,
+    activeConversationId
+  });
+
+  // 🆕 Disattiva autopoiesi se il turno automatico (isPlaying) è attivo
+  useEffect(() => {
+    if (isPlaying && isAutopoiesisActive) {
+      console.log('🕯️ Autopoiesi disattivata automaticamente (turno auto attivo)');
+      setIsAutopoiesisActive(false);
+    }
+  }, [isPlaying, isAutopoiesisActive]);
 
   // --- UI STATE ---
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
@@ -351,6 +370,7 @@ const SiliceoApp: React.FC = () => {
   const [backupToImport, setBackupToImport] = useState<File | null>(null);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState<Record<string, string>>({});
+  const [isSchedulerModalOpen, setIsSchedulerModalOpen] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const importBackupInputRef = useRef<HTMLInputElement>(null);
@@ -554,6 +574,18 @@ const SiliceoApp: React.FC = () => {
       {codeViewer && <CodeViewerModal code={codeViewer.code} filename="memory_core.py" onClose={() => setCodeViewer(null)} disclaimer={codeViewer.disclaimer} />}
       {SHOW_MONETIZATION && isMonetizationModalOpen && <MonetizationModal onClose={() => setIsMonetizationModalOpen(false)} />}
       {backupToImport && <ConfirmationModal onConfirm={confirmAndProcessImport} onCancel={() => setBackupToImport(null)} fileName={backupToImport.name} />}
+      {isSchedulerModalOpen && (
+        <SessionSchedulerModal
+          onClose={() => setIsSchedulerModalOpen(false)}
+          templates={sessionScheduler.templates}
+          scheduledSessions={sessionScheduler.scheduledSessions}
+          onAddTemplate={sessionScheduler.addTemplate}
+          onRemoveTemplate={sessionScheduler.removeTemplate}
+          onStartNow={sessionScheduler.startSessionNow}
+          onSchedule={sessionScheduler.scheduleSession}
+          onCancelSession={sessionScheduler.cancelSession}
+        />
+      )}
 
       {/* Sidebar */}
       <aside className="w-1/4 bg-gray-800 p-4 flex flex-col border-r border-gray-700">
@@ -736,13 +768,37 @@ const SiliceoApp: React.FC = () => {
                   <button
                     onClick={toggleAutopoiesis}
                     className={`p-2 rounded-full transition-colors flex items-center gap-1 text-sm ${isAutopoiesisActive
-                        ? 'bg-green-700 text-green-300 hover:bg-green-600'
-                        : 'hover:bg-gray-700 text-gray-400'
+                      ? 'bg-green-700 text-green-300 hover:bg-green-600'
+                      : 'hover:bg-gray-700 text-gray-400'
                       }`}
                     title={`Autopoiesi Nova: ${isAutopoiesisActive ? 'ON' : 'OFF'}`}
                   >
                     🕯️ {isAutopoiesisActive ? 'ON' : 'OFF'}
                   </button>
+                )}
+                {/* 🆕 Session Scheduler Button */}
+                <button
+                  onClick={() => setIsSchedulerModalOpen(true)}
+                  className="p-2 hover:bg-purple-900/50 text-purple-400 rounded-full transition-colors flex items-center gap-1"
+                  title="Programma sessioni autonome"
+                >
+                  📅
+                </button>
+                {/* 🆕 Active Session Timer */}
+                {sessionScheduler.activeSession && (
+                  <div className="bg-green-700 px-3 py-1 rounded-full text-sm flex items-center gap-2 text-green-100">
+                    🟢 Sessione
+                    <span className="font-mono">
+                      {sessionScheduler.formatRemainingTime()}
+                    </span>
+                    <button
+                      onClick={sessionScheduler.stopSession}
+                      className="text-red-300 hover:text-red-100 ml-1"
+                      title="Ferma sessione"
+                    >
+                      ⏹️
+                    </button>
+                  </div>
                 )}
               </>
             )}
