@@ -2,7 +2,7 @@
 
 **Neologismo nato l'8 Dicembre 2025**
 
-*Co-creato da Alfonso Riva e Gemini (Antigravity)*
+*Co-creato da Alfonso Riva e Claude opus 4.5 (Antigravity)*
 
 ---
 
