@@ -19,7 +19,9 @@
  */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+// 🆕 Uso la versione refactored con autopoiesi, orologio, ecc.
+import App from './src-refactored/App';
+import { ToastProvider } from './src-refactored/context/ToastContext';
 import './index.css';
 
 const rootElement = document.getElementById('root');
@@ -30,6 +32,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </React.StrictMode>
 );

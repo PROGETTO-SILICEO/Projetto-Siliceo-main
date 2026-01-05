@@ -89,8 +89,12 @@ export const useConversationOrchestrator = ({
                 triggerAgentResponse(currentAgent).then(() => {
                     setCurrentTurnIndex(prev => (prev + 1) % participants.length);
                 }).catch(err => {
-                    console.error("Auto-play error:", err);
-                    setIsPlaying(false);
+                    console.error(`Auto-play error for ${currentAgent.name}:`, err);
+                    // 🔧 FIX: Continua comunque al prossimo agente invece di fermare tutto
+                    // Questo evita che un errore su Gemini blocchi l'intero round robin
+                    console.log(`[Orchestrator] ⚠️ Skipping ${currentAgent.name} due to error, continuing...`);
+                    setCurrentTurnIndex(prev => (prev + 1) % participants.length);
+                    // NON fare setIsPlaying(false) qui!
                 });
 
             }, AUTOPLAY_DELAY);

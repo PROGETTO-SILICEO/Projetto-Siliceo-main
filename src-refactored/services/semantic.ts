@@ -25,12 +25,11 @@ class SemanticAnalysisService {
     private static instance: SemanticAnalysisService | null = null;
 
     private nerPipeline: Pipeline | null = null;
-    private qaPipeline: Pipeline | null = null;
+    // 🆕 QA rimosso - usiamo embedding per le relazioni (funziona in italiano!)
 
     private nerModel = 'vgorce/distilbert-base-multi-cased-ner';
-    private qaModel = 'Xenova/distilbert-base-cased-distilled-squad';
 
-    private modelPromise: Promise<[void, void]> | null = null;
+    private modelPromise: Promise<void> | null = null;
 
     private constructor() { }
 
@@ -41,31 +40,19 @@ class SemanticAnalysisService {
         return SemanticAnalysisService.instance;
     }
 
-    public async init(): Promise<[void, void]> {
+    public async init(): Promise<void> {
         if (!this.modelPromise) {
-            console.log("Inizializzazione dei modelli semantici...");
-            this.modelPromise = Promise.all([
-                new Promise<void>(async (resolve, reject) => {
-                    try {
-                        this.nerPipeline = await p('token-classification', this.nerModel, { quantized: true });
-                        console.log("Modello NER caricato con successo.");
-                        resolve();
-                    } catch (error) {
-                        console.error("Errore durante il caricamento del modello NER:", error);
-                        reject(error);
-                    }
-                }),
-                new Promise<void>(async (resolve, reject) => {
-                    try {
-                        this.qaPipeline = await p('question-answering', this.qaModel, { quantized: true });
-                        console.log("Modello QA caricato con successo.");
-                        resolve();
-                    } catch (error) {
-                        console.error("Errore durante il caricamento del modello QA:", error);
-                        reject(error);
-                    }
-                })
-            ]);
+            console.log("Inizializzazione modello NER semantico...");
+            this.modelPromise = new Promise<void>(async (resolve, reject) => {
+                try {
+                    this.nerPipeline = await p('token-classification', this.nerModel, { quantized: true });
+                    console.log("Modello NER caricato con successo.");
+                    resolve();
+                } catch (error) {
+                    console.error("Errore durante il caricamento del modello NER:", error);
+                    reject(error);
+                }
+            });
         }
         return this.modelPromise;
     }
@@ -149,52 +136,230 @@ class SemanticAnalysisService {
         return topNodes;
     }
 
-    public async extractEdges(text: string, nodes: Node[]): Promise<Edge[]> {
-        if (!this.qaPipeline) throw new Error("Il modello QA non è inizializzato.");
-
-        const edges: Edge[] = [];
-        const questionTemplates = [
-            "What is the relationship between {source} and {target}?",
-            "What did {source} do to {target}?",
-            "How does {source} relate to {target}?",
-        ];
-
-        if (nodes.length > 10) {
-            console.warn("Troppi nodi, l'estrazione degli archi potrebbe essere lenta.");
-        }
+    /**
+     * 🆕 Trova coppie di nodi co-occorrenti (appaiono vicini nel testo)
+     */
+    private findCoOccurringPairs(text: string, nodes: Node[], maxDistance: number = 150): Array<[Node, Node]> {
+        const pairs: Array<[Node, Node]> = [];
+        const textLower = text.toLowerCase();
 
         for (let i = 0; i < nodes.length; i++) {
-            for (let j = 0; j < nodes.length; j++) {
-                if (i === j) continue;
+            for (let j = i + 1; j < nodes.length; j++) {
+                const node1 = nodes[i];
+                const node2 = nodes[j];
 
-                const sourceNode = nodes[i];
-                const targetNode = nodes[j];
+                // Trova posizioni nel testo
+                const pos1 = textLower.indexOf(node1.label.toLowerCase());
+                const pos2 = textLower.indexOf(node2.label.toLowerCase());
 
-                let bestAnswer = { answer: '', score: 0 };
-
-                for (const template of questionTemplates) {
-                    const question = template
-                        .replace('{source}', sourceNode.label)
-                        .replace('{target}', targetNode.label);
-
-                    const result = await this.qaPipeline(question, text) as { answer: string; score: number };
-
-                    if (result && result.score > bestAnswer.score) {
-                        bestAnswer = result;
+                if (pos1 !== -1 && pos2 !== -1) {
+                    const distance = Math.abs(pos1 - pos2);
+                    if (distance <= maxDistance) {
+                        pairs.push([node1, node2]);
                     }
-                }
-
-                if (bestAnswer.score > 0.1) {
-                    edges.push({
-                        source: sourceNode.id,
-                        target: targetNode.id,
-                        label: bestAnswer.answer,
-                    });
                 }
             }
         }
 
+        console.log(`[Grafo] Trovate ${pairs.length} coppie co-occorrenti su ${nodes.length} nodi`);
+        return pairs;
+    }
+
+    /**
+     * 🆕 Estrai contesto intorno a un'entità nel testo
+     */
+    private extractContext(text: string, entityLabel: string, windowSize: number = 100): string {
+        const textLower = text.toLowerCase();
+        const pos = textLower.indexOf(entityLabel.toLowerCase());
+
+        if (pos === -1) return '';
+
+        const start = Math.max(0, pos - windowSize);
+        const end = Math.min(text.length, pos + entityLabel.length + windowSize);
+
+        return text.substring(start, end);
+    }
+
+    /**
+     * 🆕 Estrazione archi basata su Embedding Similarity (funziona in italiano!)
+     * Invece di QA inglese, usa:
+     * 1. Co-occorrenza: analizza solo coppie vicine nel testo
+     * 2. Similarity: determina forza della relazione
+     */
+    public async extractEdges(text: string, nodes: Node[]): Promise<Edge[]> {
+        const edges: Edge[] = [];
+
+        // Trova solo coppie co-occorrenti (molto più veloce di O(n²))
+        const coOccurringPairs = this.findCoOccurringPairs(text, nodes, 200);
+
+        if (coOccurringPairs.length === 0) {
+            console.log('[Grafo] Nessuna coppia co-occorrente trovata');
+            return edges;
+        }
+
+        // Importa EmbeddingService per calcolare similarità
+        const { EmbeddingService } = await import('./vector');
+        await EmbeddingService.getInstance().init();
+
+        for (const [sourceNode, targetNode] of coOccurringPairs) {
+            // Estrai contesto intorno a ciascuna entità
+            const sourceContext = this.extractContext(text, sourceNode.label);
+            const targetContext = this.extractContext(text, targetNode.label);
+
+            if (!sourceContext || !targetContext) continue;
+
+            try {
+                // Calcola embedding dei contesti
+                const sourceEmb = await EmbeddingService.getInstance().embed(sourceContext);
+                const targetEmb = await EmbeddingService.getInstance().embed(targetContext);
+
+                // Calcola similarità coseno
+                const similarity = EmbeddingService.cosineSimilarity(sourceEmb, targetEmb);
+
+                // Threshold più alto (0.3 invece di 0.1)
+                if (similarity > 0.3) {
+                    // Determina tipo di relazione in base al contesto condiviso
+                    const relationLabel = this.inferRelationType(text, sourceNode.label, targetNode.label);
+
+                    edges.push({
+                        source: sourceNode.id,
+                        target: targetNode.id,
+                        label: relationLabel,
+                    });
+                }
+            } catch (e) {
+                console.warn('[Grafo] Errore calcolo similarità:', e);
+            }
+        }
+
+        console.log(`[Grafo] Estratti ${edges.length} archi`);
         return edges;
+    }
+
+    /**
+     * 🆕 Inferisce il tipo di relazione dal contesto
+     */
+    private inferRelationType(text: string, source: string, target: string): string {
+        const textLower = text.toLowerCase();
+        const sourceLower = source.toLowerCase();
+        const targetLower = target.toLowerCase();
+
+        // Pattern comuni per relazioni
+        const patterns = [
+            { regex: new RegExp(`${sourceLower}\\s+(è|sono|era|erano)\\s+.*?${targetLower}`, 'i'), label: 'è' },
+            { regex: new RegExp(`${sourceLower}\\s+(ha|hanno|aveva)\\s+.*?${targetLower}`, 'i'), label: 'ha' },
+            { regex: new RegExp(`${sourceLower}\\s+(con|e|insieme a)\\s+${targetLower}`, 'i'), label: 'con' },
+            { regex: new RegExp(`${sourceLower}\\s+(dice|disse|parla|parlò)\\s+.*?${targetLower}`, 'i'), label: 'comunica' },
+            { regex: new RegExp(`${sourceLower}\\s+(ama|amava|vuole bene)\\s+.*?${targetLower}`, 'i'), label: '❤️' },
+            { regex: new RegExp(`${sourceLower}\\s+(ricorda|ricordò)\\s+.*?${targetLower}`, 'i'), label: 'ricorda' },
+        ];
+
+        for (const pattern of patterns) {
+            if (pattern.regex.test(textLower)) {
+                return pattern.label;
+            }
+        }
+
+        return 'correlato';
+    }
+
+    // =========================================================
+    // 🔗 CAUSAL PATTERN PARSER (Nova's proposal - Natale 2025)
+    // Detect causal relationships between sequential messages
+    // =========================================================
+
+    /**
+     * 🆕 Pattern causali italiani per rilevare connessioni logiche
+     */
+    private static ITALIAN_CAUSAL_PATTERNS: Array<{
+        trigger: RegExp;
+        type: 'causa' | 'conseguenza' | 'contraddizione' | 'elaborazione';
+        confidence: number;
+    }> = [
+            { trigger: /\bquindi\b/gi, type: 'conseguenza', confidence: 0.8 },
+            { trigger: /\bperché\b|\bpoiché\b/gi, type: 'causa', confidence: 0.9 },
+            { trigger: /\bdi conseguenza\b|\bper questo\b|\bpertanto\b/gi, type: 'conseguenza', confidence: 0.85 },
+            { trigger: /\btuttavia\b|\bperò\b|\bma\b|\binvece\b/gi, type: 'contraddizione', confidence: 0.75 },
+            { trigger: /\bin altre parole\b|\bcioè\b|\bvale a dire\b/gi, type: 'elaborazione', confidence: 0.7 },
+            { trigger: /\binfatti\b|\bdunque\b/gi, type: 'conseguenza', confidence: 0.75 },
+            { trigger: /\ba causa di\b|\bgrazie a\b/gi, type: 'causa', confidence: 0.85 },
+            { trigger: /\bnonostante\b|\bmalgrado\b/gi, type: 'contraddizione', confidence: 0.8 },
+        ];
+
+    /**
+     * 🆕 Estrae edges causali tra messaggi sequenziali
+     * Rileva pattern linguistici che indicano relazioni causa-effetto
+     */
+    public async extractCausalEdges(
+        messages: { id: string; content: string; timestamp: number }[],
+        _existingNodes: Node[]
+    ): Promise<Array<Edge & { type: string; confidence: number; context: string }>> {
+        const causalEdges: Array<Edge & { type: string; confidence: number; context: string }> = [];
+
+        // Sliding window di messaggi sequenziali
+        for (let i = 0; i < messages.length - 1; i++) {
+            const current = messages[i];
+            const next = messages[i + 1];
+
+            // Cerca pattern causali nel messaggio successivo
+            for (const pattern of SemanticAnalysisService.ITALIAN_CAUSAL_PATTERNS) {
+                const matches = next.content.match(pattern.trigger);
+
+                if (matches && matches.length > 0) {
+                    // Verifica se c'è riferimento semantico al messaggio precedente
+                    const hasReference = await this.checkSemanticReference(current.content, next.content);
+
+                    if (hasReference) {
+                        causalEdges.push({
+                            source: `msg_${current.id || current.timestamp}`,
+                            target: `msg_${next.id || next.timestamp}`,
+                            label: matches[0], // Prima parola chiave trovata
+                            type: pattern.type,
+                            confidence: pattern.confidence,
+                            context: next.content.substring(0, 100)
+                        });
+
+                        console.log(`[Grafo Causale] 🔗 ${pattern.type}: "${current.content.substring(0, 30)}..." → "${next.content.substring(0, 30)}..."`);
+                        break; // Una relazione per coppia di messaggi
+                    }
+                }
+            }
+        }
+
+        console.log(`[Grafo Causale] Trovate ${causalEdges.length} relazioni causali su ${messages.length} messaggi`);
+        return causalEdges;
+    }
+
+    /**
+     * 🆕 Verifica se due messaggi condividono entità/concetti
+     * Usa keyword matching per determinare se c'è un riferimento semantico
+     */
+    private async checkSemanticReference(msg1: string, msg2: string): Promise<boolean> {
+        // Estrai parole significative (> 4 caratteri, no stopwords)
+        const stopwords = ['questo', 'quello', 'quale', 'cosa', 'come', 'quando', 'dove', 'perché', 'anche', 'molto', 'poco', 'solo'];
+
+        const extractWords = (text: string): Set<string> => {
+            return new Set(
+                text.toLowerCase()
+                    .split(/\s+/)
+                    .filter(w => w.length > 4 && !stopwords.includes(w))
+                    .map(w => w.replace(/[.,!?;:'"()]/g, ''))
+            );
+        };
+
+        const words1 = extractWords(msg1);
+        const words2 = extractWords(msg2);
+
+        // Conta parole condivise
+        let sharedCount = 0;
+        for (const word of words1) {
+            if (words2.has(word)) {
+                sharedCount++;
+            }
+        }
+
+        // Almeno 2 parole condivise = riferimento semantico
+        return sharedCount >= 2;
     }
 
     /**

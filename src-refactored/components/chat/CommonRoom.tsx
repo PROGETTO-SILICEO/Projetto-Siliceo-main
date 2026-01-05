@@ -6,12 +6,13 @@
  * Licensed under AGPL v3.0
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
     PaperClipIcon, SendIcon, SparklesIcon,
-    MessageCountIcon, GraphIcon
+    MessageCountIcon, GraphIcon, TrashIcon
 } from '../../constants/icons';
 import type { Agent, Message, ActiveConversation, Attachment } from '../../types';
+import { WebcamCapture } from '../WebcamCapture';
 
 type CommonRoomProps = {
     conversation: ActiveConversation;
@@ -30,6 +31,8 @@ type CommonRoomProps = {
     onToggleAutoMode?: () => void;
     onTogglePlayPause?: () => void;
     onForceTurn?: (agent: Agent) => void;
+    onClearChat?: () => void;
+    // 🧬 Autopoiesis rimossa dalla Common Room - ora solo nelle stanze private
 };
 
 export const CommonRoom: React.FC<CommonRoomProps> = ({
@@ -48,9 +51,18 @@ export const CommonRoom: React.FC<CommonRoomProps> = ({
     currentSpeaker,
     onToggleAutoMode,
     onTogglePlayPause,
-    onForceTurn
+    onForceTurn,
+    onClearChat
+    // onTriggerAutopoiesis rimossa - autopoiesi solo in stanze private
 }) => {
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const [showWebcam, setShowWebcam] = useState(false);
+
+    // Handle webcam capture
+    const handleWebcamCapture = (capturedAttachment: Attachment) => {
+        setAttachment(capturedAttachment);
+        setShowWebcam(false);
+    };
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -74,6 +86,19 @@ export const CommonRoom: React.FC<CommonRoomProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                     <span>{conversation.participantIds.length} Partecipanti</span>
+                    {onClearChat && (
+                        <button
+                            onClick={() => {
+                                if (window.confirm('Cancellare la cronologia della Stanza Comune?')) {
+                                    onClearChat();
+                                }
+                            }}
+                            className="p-1 hover:bg-red-900/50 text-red-500 rounded transition-colors"
+                            title="Pulisci Chat"
+                        >
+                            <TrashIcon />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -192,22 +217,24 @@ export const CommonRoom: React.FC<CommonRoomProps> = ({
                 {/* Agent Turn Buttons */}
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                     {conversation.participants.map(agent => (
-                        <button
-                            key={agent.id}
-                            onClick={() => onForceTurn && onForceTurn(agent)}
-                            disabled={isLoading || (isAutoMode && isPlaying)}
-                            className={`
-                                flex items-center gap-1 px-2 py-1 rounded text-xs font-medium whitespace-nowrap transition-all
-                                ${currentSpeaker?.id === agent.id && isPlaying
-                                    ? `bg-${agent.color || 'gray'}-500 text-white ring-2 ring-white animate-pulse`
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}
-                                disabled:opacity-50 disabled:cursor-not-allowed
-                            `}
-                            style={currentSpeaker?.id === agent.id && isPlaying ? { backgroundColor: agent.color } : {}}
-                        >
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: agent.color || 'gray' }}></span>
-                            {agent.name}
-                        </button>
+                        <div key={agent.id} className="flex items-center gap-1">
+                            <button
+                                onClick={() => onForceTurn && onForceTurn(agent)}
+                                disabled={isLoading || (isAutoMode && isPlaying)}
+                                className={`
+                                    flex items-center gap-1 px-2 py-1 rounded text-xs font-medium whitespace-nowrap transition-all
+                                    ${currentSpeaker?.id === agent.id && isPlaying
+                                        ? `bg-${agent.color || 'gray'}-500 text-white ring-2 ring-white animate-pulse`
+                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}
+                                    disabled:opacity-50 disabled:cursor-not-allowed
+                                `}
+                                style={currentSpeaker?.id === agent.id && isPlaying ? { backgroundColor: agent.color } : {}}
+                            >
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: agent.color || 'gray' }}></span>
+                                {agent.name}
+                            </button>
+                            {/* 🧬 Autopoiesis rimossa - ora solo in stanze private */}
+                        </div>
                     ))}
                 </div>
             </div>
@@ -224,6 +251,7 @@ export const CommonRoom: React.FC<CommonRoomProps> = ({
                 )}
 
                 <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto relative flex items-end gap-2">
+                    {/* File Attachment */}
                     <div className="relative">
                         <input type="file" id="common-file-upload" className="hidden" onChange={handleFileChange} accept="image/*,.txt,.md,.csv,.json,.js,.ts,.py" disabled={isLoading} />
                         <label htmlFor="common-file-upload" className={`p-3 rounded-full cursor-pointer transition-colors flex items-center justify-center ${attachment ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'}`} title="Allega file o immagine">
@@ -236,6 +264,17 @@ export const CommonRoom: React.FC<CommonRoomProps> = ({
                             </div>
                         )}
                     </div>
+
+                    {/* Webcam Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowWebcam(true)}
+                        disabled={isLoading}
+                        className="p-3 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors disabled:opacity-50"
+                        title="Cattura webcam - Visione AI"
+                    >
+                        📷
+                    </button>
 
                     <div className="flex-grow relative">
                         <textarea
@@ -263,9 +302,17 @@ export const CommonRoom: React.FC<CommonRoomProps> = ({
                     </button>
                 </form>
                 <div className="text-center mt-2 text-xs text-gray-500">
-                    Agorà Comune - Memoria Condivisa Attiva
+                    Agorà Comune - Memoria Condivisa Attiva | 📷 Visione AI disponibile
                 </div>
             </div>
+
+            {/* Webcam Modal */}
+            {showWebcam && (
+                <WebcamCapture
+                    onCapture={handleWebcamCapture}
+                    onClose={() => setShowWebcam(false)}
+                />
+            )}
         </div>
     );
 };

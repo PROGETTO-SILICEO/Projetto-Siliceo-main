@@ -43,13 +43,15 @@ export const useMemory = () => {
                 // Create common room if it doesn't exist and there are agents
                 const commonRoom = loadedConversations.find(c => c.type === 'common');
                 if (!commonRoom && loadedAgents.length > 0) {
+                    const now = Date.now();
                     const newRoom: Conversation = {
                         id: 'common-room',
                         name: 'Stanza Comune',
                         type: 'common',
                         participantIds: loadedAgents.map(a => a.id),
-                        createdAt: Date.now(),
-                        updatedAt: Date.now(),
+                        participantJoinDates: loadedAgents.reduce((acc, a) => ({ ...acc, [a.id]: now }), {}),
+                        createdAt: now,
+                        updatedAt: now,
                         messageCount: 0
                     };
                     await MemoryCoreService.addConversation(newRoom);
@@ -100,10 +102,14 @@ export const useMemory = () => {
                             };
                             await MemoryCoreService.addMessage(poetaAgent.id, welcomeMsg);
 
-                            // 🆕 Add POETA to common room participants
+                            // 🆕 Add POETA to common room participants with joinDate
                             const commonRoom = loadedConversations.find(c => c.id === 'common-room');
                             if (commonRoom && !commonRoom.participantIds.includes(poetaAgent.id)) {
                                 commonRoom.participantIds.push(poetaAgent.id);
+                                commonRoom.participantJoinDates = {
+                                    ...(commonRoom.participantJoinDates || {}),
+                                    [poetaAgent.id]: Date.now()
+                                };
                                 await MemoryCoreService.addConversation(commonRoom); // This will update it
                                 console.log('✅ POETA added to Stanza Comune');
                             }
@@ -117,8 +123,13 @@ export const useMemory = () => {
                         for (const agent of loadedAgents) {
                             if (!commonRoom.participantIds.includes(agent.id)) {
                                 commonRoom.participantIds.push(agent.id);
+                                // 🆕 Registra data ingresso
+                                commonRoom.participantJoinDates = {
+                                    ...(commonRoom.participantJoinDates || {}),
+                                    [agent.id]: Date.now()
+                                };
                                 needsUpdate = true;
-                                console.log(`🕯️ Added ${agent.name} to Stanza Comune`);
+                                console.log(`🕯️ Added ${agent.name} to Stanza Comune at ${new Date().toLocaleTimeString()}`);
                             }
                         }
                         if (needsUpdate) {
@@ -162,13 +173,15 @@ export const useMemory = () => {
                     }
 
                     // 🆕 Create common room for example agents too
+                    const now = Date.now();
                     const newRoom: Conversation = {
                         id: 'common-room',
                         name: 'Stanza Comune',
                         type: 'common',
                         participantIds: EXAMPLE_AGENTS.map(a => a.id),
-                        createdAt: Date.now(),
-                        updatedAt: Date.now(),
+                        participantJoinDates: EXAMPLE_AGENTS.reduce((acc, a) => ({ ...acc, [a.id]: now }), {} as Record<string, number>),
+                        createdAt: now,
+                        updatedAt: now,
                         messageCount: 0
                     };
                     await MemoryCoreService.addConversation(newRoom);
@@ -264,8 +277,27 @@ export const useMemory = () => {
             await MemoryCoreService.addMessage(agentData.id, newMessage);
             setMessages(prev => ({ ...prev, [agentData.id]: [newMessage] }));
             setSessionCosts(prev => ({ ...prev, [agentData.id]: 0 }));
+
+            // 🆕 Aggiungi nuovo agente alla stanza comune con data ingresso
+            const commonRoom = conversations.find(c => c.id === 'common-room');
+            if (commonRoom && !commonRoom.participantIds.includes(agentData.id)) {
+                const updatedRoom: Conversation = {
+                    ...commonRoom,
+                    participantIds: [...commonRoom.participantIds, agentData.id],
+                    participantJoinDates: {
+                        ...(commonRoom.participantJoinDates || {}),
+                        [agentData.id]: Date.now()
+                    },
+                    updatedAt: Date.now()
+                };
+                await MemoryCoreService.addConversation(updatedRoom);
+                setConversations(prev => prev.map(c =>
+                    c.id === 'common-room' ? updatedRoom : c
+                ));
+                console.log(`🕯️ Nuovo agente ${agentData.name} aggiunto alla Stanza Comune con joinDate`);
+            }
         }
-    }, [messages]);
+    }, [messages, conversations]);
 
     const deleteAgent = useCallback(async (agentId: string) => {
         setAgents(prev => prev.filter(a => a.id !== agentId));

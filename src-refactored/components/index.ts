@@ -23,3 +23,12 @@ export { SessionSchedulerModal } from './modals/SessionSchedulerModal';
 // UI Components
 export { VerbositySelector } from './ui/VerbositySelector';
 export { CommonRoom } from './chat/CommonRoom';
+export { WebcamCapture } from './WebcamCapture';
+
+// Panels
+export { LibraryPanel } from './panels/LibraryPanel';
+export { default as MemoryStatsPanel } from './panels/MemoryStatsPanel';
+export { MCPPermissionsModal } from './modals/MCPPermissionsModal';
+
+// Code Studio
+export { CodeStudio } from './code/CodeStudio';

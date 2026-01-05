@@ -65,9 +65,17 @@ class EmbeddingService {
     }
 
     public async embed(text: string): Promise<Float32Array> {
+        // 🆕 Auto-init if not ready (lazy loading)
         if (!pipeline) {
-            throw new Error("Il modello di embedding non è ancora stato inizializzato. Chiamare init() prima.");
+            console.log('[Embedding] 🔄 Lazy loading model...');
+            await this.init();
         }
+
+        if (!pipeline) {
+            console.warn('[Embedding] ⚠️ Model still not available after init, returning empty embedding');
+            return new Float32Array(384); // Return empty embedding with correct dimensions
+        }
+
         // Normalizza il testo e lo limita per sicurezza
         const cleanText = text.replace(/\\n/g, ' ').trim();
         const output = await pipeline(cleanText, {
@@ -93,7 +101,10 @@ class EmbeddingService {
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-    public findMostSimilarDocuments<T extends { embedding: Float32Array }>(
+    // 🆕 Threshold minimo di similarità per filtrare documenti irrilevanti
+    private static readonly SIMILARITY_THRESHOLD = 0.4;
+
+    public findMostSimilarDocuments<T extends { embedding: Float32Array; name?: string }>(
         queryEmbedding: Float32Array,
         documents: T[],
         topN: number = 2
@@ -109,7 +120,25 @@ class EmbeddingService {
 
         scoredDocuments.sort((a, b) => b.similarity - a.similarity);
 
-        return scoredDocuments.slice(0, topN);
+        // 🆕 Filtra per threshold e prendi top N
+        const filtered = scoredDocuments
+            .filter(d => d.similarity >= EmbeddingService.SIMILARITY_THRESHOLD)
+            .slice(0, topN);
+
+        // 🆕 Debug logging per vedere cosa viene recuperato
+        if (filtered.length > 0) {
+            console.log('[RAG] 📚 Documenti recuperati:', filtered.map(d => ({
+                name: (d as any).name || 'unknown',
+                similarity: d.similarity.toFixed(3)
+            })));
+        } else if (scoredDocuments.length > 0) {
+            console.log('[RAG] ⚠️ Nessun documento sopra threshold', {
+                threshold: EmbeddingService.SIMILARITY_THRESHOLD,
+                bestScore: scoredDocuments[0]?.similarity.toFixed(3)
+            });
+        }
+
+        return filtered;
     }
 
     public async generateImageCaption(imageUrl: string): Promise<string> {

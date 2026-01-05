@@ -23,7 +23,7 @@ import {
   AgentModal, SettingsModal, PriceSettingsModal, CometTestimonyModal,
   FoundingStoryModal, SecurityModal, SemanticGraphModal, CodeViewerModal,
   MonetizationModal, ConfirmationModal, EthicalOnboardingModal, VerbositySelector,
-  CommonRoom, SessionSchedulerModal
+  CommonRoom, SessionSchedulerModal, CodeStudio
 } from './src-refactored/components';
 
 // Hooks
@@ -371,6 +371,7 @@ const SiliceoApp: React.FC = () => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState<Record<string, string>>({});
   const [isSchedulerModalOpen, setIsSchedulerModalOpen] = useState(false);
+  const [isCodeStudioOpen, setIsCodeStudioOpen] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const importBackupInputRef = useRef<HTMLInputElement>(null);
@@ -586,6 +587,14 @@ const SiliceoApp: React.FC = () => {
           onCancelSession={sessionScheduler.cancelSession}
         />
       )}
+      {/* Code Studio */}
+      {isCodeStudioOpen && (
+        <CodeStudio
+          onClose={() => setIsCodeStudioOpen(false)}
+          agents={agents}
+          apiKeys={apiKeys}
+        />
+      )}
 
       {/* Sidebar */}
       <aside className="w-1/4 bg-gray-800 p-4 flex flex-col border-r border-gray-700">
@@ -669,6 +678,13 @@ const SiliceoApp: React.FC = () => {
               Supporta il Progetto
             </button>
           )}
+          {/* Code Studio Button */}
+          <button
+            onClick={() => setIsCodeStudioOpen(true)}
+            className="w-full mt-2 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 rounded-md transition-colors duration-200 shadow-lg"
+          >
+            💻 Code Studio
+          </button>
         </div>
       </aside>
 
