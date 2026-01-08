@@ -24,7 +24,7 @@ export type Edge = {
 class SemanticAnalysisService {
     private static instance: SemanticAnalysisService | null = null;
 
-    private nerPipeline: Pipeline | null = null;
+    private nerPipeline: any | null = null;
     // 🆕 QA rimosso - usiamo embedding per le relazioni (funziona in italiano!)
 
     private nerModel = 'vgorce/distilbert-base-multi-cased-ner';
@@ -57,15 +57,17 @@ class SemanticAnalysisService {
         return this.modelPromise;
     }
 
-    private groupEntities(entities: TokenClassificationOutput[]): any[] {
+    private groupEntities(entities: any[]): any[] {
         const grouped: any[] = [];
         let currentEntity: any = null;
 
         for (const entity of entities) {
-            const entityType = entity.entity.replace(/^(B|I)-/, '');
+            // Fix: handle both 'entity' and 'label' properties if library changes
+            const rawEntity = entity.entity || entity.label;
+            const entityType = rawEntity.replace(/^(B|I)-/, '');
             const entityWord = entity.word.replace(/^##/, '');
 
-            if (entity.entity.startsWith('B-') || !currentEntity || currentEntity.type !== entityType) {
+            if (rawEntity.startsWith('B-') || !currentEntity || currentEntity.type !== entityType) {
                 if (currentEntity) grouped.push(currentEntity);
                 currentEntity = {
                     label: entityWord,
@@ -92,7 +94,8 @@ class SemanticAnalysisService {
     public async extractNodes(text: string): Promise<Node[]> {
         if (!this.nerPipeline) throw new Error("Il modello NER non è inizializzato.");
 
-        const nerResult = await this.nerPipeline(text) as TokenClassificationOutput[];
+        // Cast to any to avoid type errors with strict TokenClassificationOutput
+        const nerResult = await this.nerPipeline(text) as any[];
         const groupedEntities = this.groupEntities(nerResult);
 
         console.log("DEBUG: Entità grezze trovate dal modello NER:", groupedEntities);
