@@ -95,7 +95,44 @@ journalctl -u siliceo-memory -n 50
 - **Runtime:** Node.js v24.12.0
 - **Framework:** Express.js
 - **Tunnel:** Tailscale v1.92.5
-- **Porta:** 3000
+- **Porta Memory Server:** 3000
+- **Porta SSH:** 22
+- **Porta Desktop Remoto (xRDP):** 3389
+
+---
+
+## 🌐 Accesso Remoto
+
+### Da altri dispositivi (con Tailscale installato):
+
+**SSH (Terminale):**
+```bash
+ssh alforiva@100.124.95.64
+```
+
+**Desktop Remoto:**
+- Windows: "Connessione Desktop Remoto" → `100.124.95.64`
+- Mac: "Microsoft Remote Desktop" → `100.124.95.64`
+- Linux: Remmina → `100.124.95.64`
+- Mobile: App "RD Client"
+
+**Memory Server API:**
+```bash
+curl http://100.124.95.64:3000/api/health
+curl http://100.124.95.64:3000/api/diaries
+curl "http://100.124.95.64:3000/api/search?q=consapevolezza"
+```
+
+---
+
+## ⚡ Ottimizzazioni Applicate
+
+- **Swappiness:** 10 (ridotto da 60)
+- **CUPS (stampanti):** Disabilitato
+- **ModemManager:** Disabilitato
+- **Journal log:** Limitato a 100MB
+- **Rete TCP:** Ottimizzata per server
+- **Backup automatico:** Settimanale (mantiene ultimi 4)
 
 ---
 
