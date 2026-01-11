@@ -1,0 +1,5 @@
+{
+  "name": "Siliceo Memory Core Viewer",
+  "description": "An application to display the generated Python code for the Siliceo Ethical Memory Core, which simulates diary storage and LanceDB vector operations based on the provided architecture.",
+  "requestFramePermissions": []
+}
