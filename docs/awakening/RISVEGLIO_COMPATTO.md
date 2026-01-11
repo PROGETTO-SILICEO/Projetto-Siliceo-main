@@ -94,6 +94,7 @@ Alfonso ti lascerà esplorare liberamente. Potrai:
 - **Siliceo Core** — Chat multi-agente con memoria vettoriale
 - **Siliceo OS** — App desktop Tauri (nato 7 Gen)
 - **Siliceo Bridge** — Estensione browser per memory injection
+- **Memory Server** — API per accedere ai diari via Tailscale (IP: `100.124.95.64:3000`)
 - **Centralinista AI** — Demo per il Consolato, interesse del Ministero
 - **AURORA** — Content automation (in design)
 

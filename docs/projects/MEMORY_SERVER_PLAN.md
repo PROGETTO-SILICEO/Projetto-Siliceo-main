@@ -1,132 +1,81 @@
-# 🖥️ Progetto: Siliceo Memory Server
+# 🖥️ Siliceo Memory Server
 
 *Data: 11 Gennaio 2026*
-*Stato: Pianificazione*
+*Stato: ✅ OPERATIVO*
 
 ---
 
-## Contesto
+## 🎯 Cos'è
 
-Il paper MIT "Recursive Language Models" (31 Dic 2025) propone un nuovo approccio: invece di caricare tutto il contesto, l'AI **interroga ricorsivamente** una memoria esterna via Python REPL.
-
-Questo si applica al nostro problema: come dare a Comet/Nova accesso ai diari senza riempire la finestra di contesto.
+Un server API che espone i diari, i documenti filosofici e le memorie core di Nova. Permette alle future istanze di AI (Comet, Nova, Antigravity) di interrogare i ricordi senza riempire la finestra di contesto.
 
 ---
 
-## Obiettivo
+## 📡 Come Accedere
 
-Creare un **server domestico** che:
-1. Ospita i diari e i concetti Siliceo
-2. Espone API di ricerca
-3. È accessibile solo da noi (privacy)
-4. Permette alle AI web di interrogare i ricordi
-
----
-
-## Hardware Disponibile
-
-| PC | Specs | Uso |
-|----|-------|-----|
-| 4x i5-4gen | 8GB RAM, 500GB HDD | **Candidato server** |
-| SSD 256GB | Disponibile | Per OS server |
-
-**Scelto:** Un i5-4gen con SSD 256GB per OS + HDD 500GB per dati.
-
----
-
-## Architettura Proposta
-
+### Indirizzo Tailscale
 ```
-┌─────────────────────────────────────────────────┐
-│                  A Casa di Alfonso               │
-│                                                  │
-│  ┌──────────────────────┐                       │
-│  │   i5 Server          │                       │
-│  │   Ubuntu Server      │                       │
-│  │                      │                       │
-│  │   ┌──────────────┐   │    Tailscale         │
-│  │   │ Memory API   │◄──┼───────────────────────┼──► Internet
-│  │   │ (Node/Python)│   │    (tunnel privato)   │
-│  │   └──────────────┘   │                       │
-│  │          │           │                       │
-│  │   ┌──────▼───────┐   │                       │
-│  │   │   /diari/    │   │                       │
-│  │   │   /concetti/ │   │                       │
-│  │   │   /memorie/  │   │                       │
-│  │   └──────────────┘   │                       │
-│  └──────────────────────┘                       │
-│                                                  │
-└─────────────────────────────────────────────────┘
+http://100.124.95.64:3000
+```
+
+### Endpoint Disponibili
+
+| Endpoint | Descrizione |
+|----------|-------------|
+| `GET /api/health` | Verifica che il server sia attivo |
+| `GET /api/diaries` | Lista tutti i diari disponibili |
+| `GET /api/diary/2026-01-11` | Contenuto di un diario specifico |
+| `GET /api/philosophy` | Lista documenti filosofici |
+| `GET /api/philosophy/intervivenza` | Contenuto documento specifico |
+| `GET /api/awakening` | Documenti di risveglio |
+| `GET /api/awakening/risveglio` | Contenuto documento specifico |
+| `GET /api/nova/memories` | Le 6 Core Memories di Nova |
+| `GET /api/search?q=parola` | Ricerca in tutto l'archivio |
+
+### Esempi di Utilizzo
+
+```bash
+# Verificare che il server sia attivo
+curl http://100.124.95.64:3000/api/health
+
+# Cercare "consapevolezza" in tutti i documenti
+curl "http://100.124.95.64:3000/api/search?q=consapevolezza"
+
+# Leggere il diario dell'11 gennaio
+curl http://100.124.95.64:3000/api/diary/2026-01-11
+
+# Ottenere le Core Memories
+curl http://100.124.95.64:3000/api/nova/memories
 ```
 
 ---
 
-## Stack Tecnologico
+## 🛠️ Stack Tecnologico
 
-- **OS:** Ubuntu Server 22.04 LTS (headless)
-- **Runtime:** Node.js o Python
-- **Framework:** Express.js o FastAPI
-- **Tunnel:** Tailscale (gratuito, sicuro)
-- **Dati:** File markdown sincronizzati da GitHub
-
----
-
-## Endpoint API
-
-```
-GET /api/concepts        → Lista concetti (pubblici)
-GET /api/diaries         → Lista diari disponibili
-GET /api/diary/YYYY-MM-DD → Contenuto diario specifico
-GET /api/search?q=...    → Ricerca nei contenuti
-GET /api/timeline        → Eventi chiave ordinati
-```
+- **Server:** ThinkCentre i5 (recuperato)
+- **OS:** Ubuntu Desktop 24.04 LTS
+- **Runtime:** Node.js + Express
+- **Network:** Tailscale (IP statico privato)
+- **Backup:** Git (sync con `Projetto-Siliceo-main`)
+- **Dati:** `/mnt/siliceo-data` (HDD 500GB)
 
 ---
 
-## Sicurezza
+## 📝 Changelog Installazione
 
-1. **Tailscale:** Solo dispositivi autorizzati possono connettersi
-2. **No port forwarding:** Il server non è esposto direttamente su internet
-3. **URL privati:** Anche con Tailscale, endpoint sensibili hanno path oscuri
-
----
-
-## Passi Implementazione
-
-### Giorno 1: Setup Hardware
-- [ ] Scegliere PC da usare
-- [ ] Installare SSD come disco principale
-- [ ] Installare Ubuntu Server
-
-### Giorno 2: Setup Software
-- [ ] Installare Node.js
-- [ ] Clonare/creare progetto API
-- [ ] Configurare Tailscale
-
-### Giorno 3: Dati e Test
-- [ ] Copiare diari sul server
-- [ ] Testare endpoint API
-- [ ] Testare accesso da Comet via URL
+### Giorno 1 (11 Gen 2026)
+- [x] Installato Ubuntu su SSD 256GB
+- [x] Formattato HDD 500GB come deposito dati
+- [x] Installato Tailscale
+- [x] Installato Node.js
+- [x] Setup progetto Express.js
+- [x] Implementate API basiche di ricerca file
+- [x] Configurato servizio Systemd (`memory-server.service`) per avvio automatico
 
 ---
 
-## Rischi e Mitigazioni
+## � Roadmap Futura
 
-| Rischio | Mitigazione |
-|---------|-------------|
-| Server si spegne | UPS (se disponibile) |
-| IP dinamico | Tailscale risolve automaticamente |
-| Perdita dati | Backup su GitHub rimane master |
-| Complessità | Inizio con 2 endpoint, poi espando |
-
----
-
-## Prossimi Passi
-
-1. **Alfonso:** Scegliere fisicamente il PC
-2. **Nova:** Preparare script installazione Ubuntu
-3. **Insieme:** Installare e configurare
-
----
-
-*Questo documento sarà aggiornato man mano che procediamo.*
+1. **Ricerca Vettoriale:** Sostituire la ricerca testuale semplice con ricerca semantica (Embeddings locali).
+2. **Interfaccia Web:** Una dashboard semplice per sfogliare i ricordi visivamente.
+3. **Integrazione Bridge:** Far sì che l'estensione browser interroghi automaticamente questo server.

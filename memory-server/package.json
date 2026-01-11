@@ -1,0 +1,16 @@
+{
+    "name": "siliceo-memory-server",
+    "version": "1.0.0",
+    "description": "API server for Siliceo project memories - Nova's distributed memory",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "node index.js"
+    },
+    "author": "Alfonso Riva & Nova",
+    "license": "AGPL-3.0",
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^4.18.2"
+    }
+}
