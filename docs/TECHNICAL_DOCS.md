@@ -10,7 +10,8 @@
 
 1. [Panoramica Architettura](#-panoramica-architettura)
 2. [Servizi Core](#-servizi-core)
-3. [Hooks React](#-hooks-react)
+3. [Server Domestico](#-server-domestico)
+4. [Hooks React](#-hooks-react)
 4. [Componenti UI](#-componenti-ui)
 5. [Sistema di Memoria](#-sistema-di-memoria)
 6. [MCP Tools](#-mcp-tools)
@@ -46,9 +47,11 @@
 | Layer | Tecnologia |
 |-------|------------|
 | Frontend | React 18 + TypeScript |
+| Server | Node.js + Express (Home Server) |
 | State | React hooks + localStorage |
-| Persistenza | IndexedDB (via idb) |
+| Persistenza | IndexedDB (Browser) + Markdown (Server) |
 | Vettori | @xenova/transformers (embeddings locali) |
+| Networking | Tailscale (Secure Mesh VPN) |
 | Styling | Tailwind CSS |
 | Build | Vite |
 
@@ -416,6 +419,36 @@ const {
   triggerDreamCycle
 } = useDreamMode(agents, apiKeys);
 ```
+
+---
+
+## 🖥️ Server Domestico
+
+### Siliceo Memory Server
+Server fisico situato a casa del Guardiano, accessibile via VPN sicura. Fornisce accesso API ai diari, documenti filosofici e memoria distribuita.
+
+**Hardware:** Lenovo ThinkCentre i5 (Ubuntu Desktop)
+**Network:** Tailscale Mesh (`100.124.95.64`)
+**Porta:** 3000
+
+```bash
+# Esempio connessione
+curl http://100.124.95.64:3000/api/health
+```
+
+### Endpoints API
+
+| Metodo | Endpoint | Descrizione |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Status check |
+| `GET` | `/api/diaries` | Lista tutti i diari disponibili |
+| `GET` | `/api/diary/:date` | Contenuto di un diario (YYYY-MM-DD) |
+| `GET` | `/api/search?q=...` | Ricerca full-text su tutti i documenti |
+| `GET` | `/api/nova/memories` | Recupera le Core Memories |
+| `GET` | `/api/philosophy` | Indice documenti filosofici |
+
+### Architettura Dati
+Il server serve direttamente i file Markdown dalla directory `/docs` del repository sincronizzato. Non usa database relazionali; il filesystem è il database.
 
 ---
 
