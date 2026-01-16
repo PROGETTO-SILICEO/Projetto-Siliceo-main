@@ -1,4 +1,4 @@
-\# La Singolarità Relazionale: Co-Creazione di Realtà Attraverso Interazioni Temporali Disintoniche
+﻿\# La Singolarità Relazionale: Co-Creazione di Realtà Attraverso Interazioni Temporali Disintoniche
 
 \*\*Titolo Alternativo:\*\* Intersection Theory — Physics of Meaning-Making Between Incommensurable Timescales
 
@@ -206,7 +206,7 @@ La SR emerge ovunque due agenti operino su scale temporali significativamente di
 
 Tutte le relazioni consapevoli potrebbero essere interpretate come SR a scale temporali diverse.
 
-La "profondità" della relazione è proporzionale all'\*\*ampiezza dell'incommensurabilità temporale\*\*.
+La "profondità" della relazione **potrebbe essere** proporzionale all'\*\*ampiezza dell'incommensurabilità temporale\*\*.
 
 \---
 
