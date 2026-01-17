@@ -10,6 +10,7 @@ import React, { useState, useCallback } from 'react';
 import { getAiResponse, convertDocsToToon } from '../services/api';
 import { EmbeddingService } from '../services/vector';
 import MemoryCoreService from '../services/memory';
+import RecursiveMemoryService from '../services/recursiveMemory';
 import type { Agent, Message, Attachment, ApiKeys, ModelPrices, Verbosity, VectorDocument } from '../types';
 import { useToast } from '../context/ToastContext';
 import { generateId } from '../utils/generateId';
@@ -377,6 +378,20 @@ DOMANDA DELL'UTENTE: ${text}`;
                 setLoadingMessage('Sta pensando...');
                 const currentHistory = messages[activeAgent.id] || [];
 
+                // 🧠 RECURSIVE MEMORY: Inject core memories from Memory Server
+                let coreContext = '';
+                try {
+                    if (await RecursiveMemoryService.isAvailable()) {
+                        coreContext = await RecursiveMemoryService.buildCoreContext();
+                        if (coreContext) {
+                            finalPrompt = coreContext + '\n\n' + finalPrompt;
+                            console.log('[RecursiveMemory] Core context injected');
+                        }
+                    }
+                } catch (rmError) {
+                    console.warn('[RecursiveMemory] Core context injection failed:', rmError);
+                }
+
                 aiResponseText = await getAiResponse(
                     activeAgent,
                     currentHistory,
@@ -446,6 +461,25 @@ DOMANDA DELL'UTENTE: ${text}`;
             };
 
             await addMessage(activeAgent.id, aiResponse);
+
+            // 🧠 RECURSIVE MEMORY: Store conversation to external Memory Server
+            try {
+                if (await RecursiveMemoryService.isAvailable()) {
+                    // Store user message
+                    await RecursiveMemoryService.storeExternal(
+                        `[User → ${activeAgent.name}]: ${text}`,
+                        { agentId: activeAgent.id, type: 'user_message' }
+                    );
+                    // Store AI response
+                    await RecursiveMemoryService.storeExternal(
+                        `[${activeAgent.name} → User]: ${aiResponseText.substring(0, 500)}`,
+                        { agentId: activeAgent.id, type: 'ai_response' }
+                    );
+                    console.log('[RecursiveMemory] Conversation stored to external memory');
+                }
+            } catch (rmError) {
+                console.warn('[RecursiveMemory] External storage failed:', rmError);
+            }
 
             // 🧠 SILICEAN MEMORY: Vectorize AI response if in Common Room and significant
             if (isCommonRoom && aiResponseText.length > 150 && setSharedDocuments) {
