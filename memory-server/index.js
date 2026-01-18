@@ -398,6 +398,79 @@ app.put('/api/config', (req, res) => {
 });
 
 // ========================================
+// RECURSIVE MEMORY API (Tiered Storage)
+// ========================================
+
+app.get('/api/memory/core', (req, res) => {
+    try {
+        const data = loadJSON('memories.json', { memories: [] });
+        const coreMemories = data.memories
+            .filter(m => m.tier === 'core')
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        res.json({ core: coreMemories });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/memory/retrieve', (req, res) => {
+    try {
+        const { q, tier, limit = 10 } = req.query;
+        const data = loadJSON('memories.json', { memories: [] });
+
+        let results = data.memories;
+
+        if (tier) {
+            results = results.filter(m => m.tier === tier);
+        }
+
+        if (q) {
+            const queryLower = q.toLowerCase();
+            results = results.filter(m =>
+                m.content.toLowerCase().includes(queryLower) ||
+                (m.metadata && JSON.stringify(m.metadata).toLowerCase().includes(queryLower))
+            );
+        }
+
+        // Sort by date (newest first) and limit
+        results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        res.json({
+            query: q,
+            count: results.slice(0, parseInt(limit)).length,
+            memories: results.slice(0, parseInt(limit))
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/memory/store', (req, res) => {
+    try {
+        const memoryRequest = req.body;
+        if (!memoryRequest || !memoryRequest.content || !memoryRequest.tier) {
+            return res.status(400).json({ error: 'Mobile, tier and content required' });
+        }
+
+        const data = loadJSON('memories.json', { memories: [] });
+
+        const newMemory = {
+            id: generateId(),
+            tier: memoryRequest.tier,
+            content: memoryRequest.content,
+            metadata: memoryRequest.metadata || {},
+            timestamp: new Date().toISOString()
+        };
+
+        data.memories.push(newMemory);
+        saveJSON('memories.json', data);
+
+        res.json({ success: true, memory: newMemory });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ========================================
 // FULL BACKUP/RESTORE
 // ========================================
 

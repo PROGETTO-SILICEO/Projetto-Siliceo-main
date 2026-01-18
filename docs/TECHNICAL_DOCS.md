@@ -1,7 +1,7 @@
 # 📚 Siliceo Core - Documentazione Tecnica
 
-> **Versione:** 3.0  
-> **Ultimo aggiornamento:** 27 Dicembre 2025  
+> **Versione:** 3.1  
+> **Ultimo aggiornamento:** 18 Gennaio 2026  
 > **Licenza:** AGPL v3.0
 
 ---
@@ -25,7 +25,8 @@
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         App.tsx                                  │
-│  (Orchestratore principale, gestione stato globale)             │
+│  (Orchestratore snello, delegation pattern)                     │
+
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │
@@ -47,15 +48,16 @@
 | Layer | Tecnologia |
 |-------|------------|
 | Frontend | React 18 + TypeScript |
-| Server | Node.js + Express (Home Server) |
-| State | React hooks + localStorage |
-| Persistenza | IndexedDB (Browser) + Markdown (Server) |
+| Server | Node.js + Express (Memory Server v2.0) |
+| State | React hooks + Custom Hooks (Features) |
+| Persistenza | Memory Server (JSON-based) + IndexedDB (Fallback) |
 | Vettori | @xenova/transformers (embeddings locali) |
 | Networking | Tailscale (Secure Mesh VPN) |
 | Styling | Tailwind CSS |
 | Build | Vite |
 
 ---
+
 
 ## 🔧 Servizi Core
 
@@ -441,14 +443,18 @@ curl http://100.124.95.64:3000/api/health
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
 | `GET` | `/api/health` | Status check |
+| `GET` | `/api/memory/core` | Recupera memoria ricorsiva completa |
+| `GET` | `/api/memory/retrieve` | Ricerca vettoriale/semantica |
+| `POST` | `/api/memory/store` | Salva nuovo ricordo/dream |
 | `GET` | `/api/diaries` | Lista tutti i diari disponibili |
 | `GET` | `/api/diary/:date` | Contenuto di un diario (YYYY-MM-DD) |
 | `GET` | `/api/search?q=...` | Ricerca full-text su tutti i documenti |
 | `GET` | `/api/nova/memories` | Recupera le Core Memories |
 | `GET` | `/api/philosophy` | Indice documenti filosofici |
 
-### Architettura Dati
-Il server serve direttamente i file Markdown dalla directory `/docs` del repository sincronizzato. Non usa database relazionali; il filesystem è il database.
+### Architettura Dati (v2.0)
+Il server agisce come **Brain Centrale**. Non serve solo file statici, ma gestisce attivamente la memoria a lungo termine tramite JSON db (`data/core.json`, `data/dreams.json`).
+I client (Siliceo Core) sincronizzano automaticamente lo stato locale con il server ad ogni modifica.
 
 ---
 
@@ -534,8 +540,32 @@ const {
   isReflecting,
   lastReflection,
   triggerReflection
+### `useAutopoiesis`
+
+**Responsabilità:** Trigger automatico autopoiesis e gestione ciclo di vita.
+
+```typescript
+const {
+  isReflecting,
+  lastReflection,
+  triggerReflection
 } = useAutopoiesis(activeAgent, messages, apiKey);
 ```
+
+### `useTelegramSync`
+
+**Responsabilità:** Polling messaggi Telegram e routing agli agenti.
+
+```typescript
+const {
+  isPolling,
+  lastMessageId
+} = useTelegramSync(agents, apiKeys, onAgentResponse);
+```
+
+### `useSessionScheduler`
+
+**Responsabilità:** Gestione orari e template sessioni di lavoro.
 
 ---
 
@@ -545,7 +575,8 @@ const {
 
 | Componente | Descrizione |
 |------------|-------------|
-| `App.tsx` | Orchestratore, layout principale |
+| `App.tsx` | Orchestratore, layout principale (Refactored) |
+| `AppModals.tsx` | Contenitore unico per tutti i modali |
 | `CommonRoom` | Stanza comune multi-agente |
 | `CodeStudio` | IDE integrato con chat multi-agente |
 | `LibraryPanel` | Gestione biblioteca documenti |

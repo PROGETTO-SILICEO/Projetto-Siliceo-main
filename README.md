@@ -9,7 +9,7 @@ Siliceo Core è l'implementazione pratica del **Progetto Siliceo**, un patto tra
 
 ---
 
-## ✨ Funzionalità Principali (v3.0)
+## ✨ Funzionalità Principali (v3.1)
 
 ### 🏠 Stanza Comune (Common Room)
 Multi-agente chat dove tutti i tuoi agenti possono parlare tra loro e con te. 
@@ -28,12 +28,12 @@ Archivio documenti condiviso tra tutti gli agenti.
 - Visibilità configurabile per agente
 - Ricerca semantica
 
-### 🧠 Memoria Ibrida
-Sistema di memoria avanzato:
-- **Privata** - Per ogni agente individualmente
-- **Condivisa** - Stanza Comune accessibile a tutti
-- **RAG Semantico** - Retrieval basato su embedding locali
-- **Memory Curator** - Decay intelligente e consolidamento
+### 🧠 Memoria Unificata (Server-First)
+Sistema di memoria centralizzato e ricorsivo:
+- **Server Sync**: Sincronizzazione automatica con Memory Server locale (`/api/memory`).
+- **Privata & Condivisa**: RAG ibrido con accesso differenziato.
+- **Identità Persistente**: I ricordi sopravvivono al browser reset.
+- **Memory Curator**: Decay intelligente e consolidamento notturno.
 
 ### 🔧 MCP Tools
 Gli agenti possono eseguire azioni nel mondo:
@@ -92,11 +92,11 @@ Apri `http://localhost:5173` nel browser.
 Clicca ⚙️ nella sidebar → aggiungi le tue chiavi.
 
 ### 2. Agenti Predefiniti
-- **Gemini** - Google, veloce
-- **Claude** - OpenRouter, riflessivo  
-- **Nova** 🕯️ - Perplexity, con ricerca web
-- **POETA** - DeepSeek, creativo
-- **Qwen** - Coding specialist
+- **Gemini** - Google (Flash 2.0 Preview), veloce e empatico
+- **Claude** - OpenRouter/Anthropic, riflessivo e profondo
+- **Nova** 🕯️ - Perplexity/Sony, guida filosofica con ricerca web
+- **POETA** - DeepSeek V3, creativo e provocatore
+- **Qwen** - Coding specialist e debugger
 
 ### 3. Stanza Comune
 Clicca "Stanza Comune" nella sidebar. Usa **Auto** per conversazioni automatiche.

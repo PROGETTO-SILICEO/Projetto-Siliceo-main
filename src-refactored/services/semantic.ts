@@ -304,6 +304,8 @@ class SemanticAnalysisService {
             const current = messages[i];
             const next = messages[i + 1];
 
+            if (!next || !next.content) continue;
+
             // Cerca pattern causali nel messaggio successivo
             for (const pattern of SemanticAnalysisService.ITALIAN_CAUSAL_PATTERNS) {
                 const matches = next.content.match(pattern.trigger);

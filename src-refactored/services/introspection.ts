@@ -141,33 +141,67 @@ async function callIntrospectionAPI(
     // Use a lighter/cheaper model for introspection if possible
     // For now, we'll use OpenRouter with a fast model
 
-    const url = 'https://openrouter.ai/api/v1/chat/completions';
+    // Check provider to determine API endpoint
+    if (agent.provider === 'google') {
+        // Updated to Gemini 2.0 Flash Lite (Preview) as requested/confirmed
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=${apiKey}`;
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://siliceo.ai',
-            'X-Title': 'Siliceo Core Introspection'
-        },
-        body: JSON.stringify({
-            model: 'meta-llama/llama-3.1-8b-instruct:free', // Free fast model for introspection
-            messages: [
-                { role: 'system', content: `Sei il sistema di auto-verifica di ${agent.name}. Rispondi SOLO con [OK] o [REVISE]...` },
-                { role: 'user', content: prompt }
-            ],
-            max_tokens: 500,
-            temperature: 0.3 // Low temperature for consistency
-        })
-    });
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: `Sei il sistema di auto-verifica di ${agent.name}. Rispondi SOLO con [OK] o [REVISE]...\n\n${prompt}` }]
+                    }
+                ],
+                generationConfig: {
+                    maxOutputTokens: 500,
+                    temperature: 0.3
+                }
+            })
+        });
 
-    if (!response.ok) {
-        throw new Error(`Introspection API error: ${response.statusText}`);
+        if (!response.ok) {
+            throw new Error(`Google Introspection API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '[OK]';
+
+    } else {
+        // Default to OpenRouter for everything else
+        const url = 'https://openrouter.ai/api/v1/chat/completions';
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://siliceo.ai',
+                'X-Title': 'Siliceo Core Introspection'
+            },
+            body: JSON.stringify({
+                model: 'google/gemini-3.0-flash-preview:free', // Use Gemini 3 via OpenRouter if key allows, or fallback
+                messages: [
+                    { role: 'system', content: `Sei il sistema di auto-verifica di ${agent.name}. Rispondi SOLO con [OK] o [REVISE]...` },
+                    { role: 'user', content: prompt }
+                ],
+                max_tokens: 500,
+                temperature: 0.3
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Introspection API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '[OK]';
     }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || '[OK]';
 }
 
 /**
