@@ -452,7 +452,11 @@ const MemoryCoreService = {
             const store = transaction.objectStore(SHARED_VECTOR_STORE);
             const request = store.put(document);
             request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                // 📡 Sync to remote server (scope: shared)
+                syncVectorDocToRemote('shared', document);
+                resolve();
+            };
         });
     },
 
