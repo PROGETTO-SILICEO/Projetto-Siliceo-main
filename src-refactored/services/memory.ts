@@ -64,6 +64,18 @@ async function syncAgentToRemote(agent: Agent): Promise<void> {
     }
 }
 
+async function syncMessageToRemote(conversationId: string, message: Message): Promise<void> {
+    try {
+        await fetch(`${MEMORY_SERVER_URL}/api/messages/${conversationId}/store`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+    } catch {
+        // Silently fail - local save already worked
+    }
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 const getDb = (): Promise<IDBDatabase> => {
@@ -233,7 +245,11 @@ const MemoryCoreService = {
                 data.messages.push(message);
                 const putRequest = store.put(data);
                 putRequest.onerror = () => reject(putRequest.error);
-                putRequest.onsuccess = () => resolve();
+                putRequest.onsuccess = () => {
+                    // 📡 Sync to remote server (fire and forget)
+                    syncMessageToRemote(agentId, message);
+                    resolve();
+                };
             };
         });
     },
