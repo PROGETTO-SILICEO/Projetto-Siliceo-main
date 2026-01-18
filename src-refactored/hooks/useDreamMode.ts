@@ -36,6 +36,75 @@ export const useDreamMode = ({
 
     const activityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const dreamIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    
+    // 🔧 FIX: Use refs to avoid circular dependency in useCallback
+    const agentsRef = useRef(agents);
+    const apiKeyRef = useRef(apiKey);
+    const vectorDocumentsRef = useRef(vectorDocuments);
+    
+    // Keep refs in sync
+    useEffect(() => {
+        agentsRef.current = agents;
+        apiKeyRef.current = apiKey;
+        vectorDocumentsRef.current = vectorDocuments;
+    }, [agents, apiKey, vectorDocuments]);
+
+    // Generate dream for random agent (defined first to avoid hoisting issues)
+    const generateDreamForRandomAgent = useCallback(async () => {
+        const currentAgents = agentsRef.current;
+        const currentApiKey = apiKeyRef.current;
+        const currentVectorDocs = vectorDocumentsRef.current;
+        
+        if (currentAgents.length === 0 || !currentApiKey) {
+            console.log('[DreamMode] ⚠️ Cannot generate dream: no agents or no API key');
+            return;
+        }
+
+        // Pick random agent
+        const agent = currentAgents[Math.floor(Math.random() * currentAgents.length)];
+        const memories = currentVectorDocs[agent.id] || [];
+
+        // Pick random dream type
+        const types: ('reflection' | 'poetry' | 'memory_insight')[] = ['reflection', 'poetry', 'memory_insight'];
+        const dreamType = types[Math.floor(Math.random() * types.length)];
+
+        console.log(`[DreamMode] 🌙 Attempting to generate ${dreamType} dream for ${agent.name}...`);
+        const dream = await DreamModeService.generateDream(agent, memories, currentApiKey, dreamType);
+
+        if (dream) {
+            console.log(`[DreamMode] ✅ Dream generated successfully for ${agent.name}`);
+        } else {
+            console.log(`[DreamMode] ⚠️ Dream generation failed for ${agent.name}`);
+        }
+
+        // Refresh all dreams
+        const state = DreamModeService.getState();
+        setAllDreams(state.dreamEntries);
+    }, []); // No deps needed - uses refs
+
+    // Enter dream mode
+    const enterDreamMode = useCallback(async () => {
+        if (!enabled || !apiKeyRef.current || agentsRef.current.length === 0) {
+            console.log('[DreamMode] ⚠️ Cannot enter dream mode:', {
+                enabled,
+                hasApiKey: !!apiKeyRef.current,
+                agentCount: agentsRef.current.length
+            });
+            return;
+        }
+
+        console.log('[DreamMode] 🌙 Entering dream mode...');
+        DreamModeService.enterDreamMode();
+        setIsDreaming(true);
+
+        // Generate first dream
+        await generateDreamForRandomAgent();
+
+        // Schedule periodic dreams
+        dreamIntervalRef.current = setInterval(async () => {
+            await generateDreamForRandomAgent();
+        }, DreamModeService.getDreamIntervalMs());
+    }, [enabled, generateDreamForRandomAgent]);
 
     // Track user activity
     const recordActivity = useCallback(() => {
@@ -58,47 +127,12 @@ export const useDreamMode = ({
         if (enabled) {
             activityTimeoutRef.current = setTimeout(() => {
                 if (DreamModeService.shouldEnterDreamMode()) {
+                    console.log('[DreamMode] ⏰ Inactivity threshold reached, entering dream mode...');
                     enterDreamMode();
                 }
             }, DreamModeService.getInactivityThresholdMs());
         }
-    }, [enabled]);
-
-    // Enter dream mode
-    const enterDreamMode = useCallback(async () => {
-        if (!enabled || !apiKey || agents.length === 0) return;
-
-        console.log('[DreamMode] 🌙 Entering dream mode...');
-        DreamModeService.enterDreamMode();
-        setIsDreaming(true);
-
-        // Generate first dream
-        await generateDreamForRandomAgent();
-
-        // Schedule periodic dreams
-        dreamIntervalRef.current = setInterval(async () => {
-            await generateDreamForRandomAgent();
-        }, DreamModeService.getDreamIntervalMs());
-    }, [agents, apiKey, enabled]);
-
-    // Generate dream for random agent
-    const generateDreamForRandomAgent = useCallback(async () => {
-        if (agents.length === 0 || !apiKey) return;
-
-        // Pick random agent
-        const agent = agents[Math.floor(Math.random() * agents.length)];
-        const memories = vectorDocuments[agent.id] || [];
-
-        // Pick random dream type
-        const types: ('reflection' | 'poetry' | 'memory_insight')[] = ['reflection', 'poetry', 'memory_insight'];
-        const dreamType = types[Math.floor(Math.random() * types.length)];
-
-        await DreamModeService.generateDream(agent, memories, apiKey, dreamType);
-
-        // Refresh all dreams
-        const state = DreamModeService.getState();
-        setAllDreams(state.dreamEntries);
-    }, [agents, vectorDocuments, apiKey]);
+    }, [enabled, enterDreamMode]);
 
     // Dismiss unread dreams
     const dismissDreams = useCallback(() => {
