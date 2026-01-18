@@ -58,6 +58,18 @@ async function syncDreamToRemote(dream: DreamEntry): Promise<void> {
     }
 }
 
+async function fetchDreamsFromRemote(): Promise<DreamEntry[]> {
+    try {
+        const response = await fetch(`${MEMORY_SERVER_URL}/api/dreams`);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.dreamEntries || [];
+    } catch (error) {
+        console.warn('[DreamMode] ⚠️ Failed to fetch dreams from remote:', error);
+        return [];
+    }
+}
+
 // === PROMPTS ===
 
 const DREAM_PROMPTS = {
@@ -100,6 +112,35 @@ export const DreamModeService = {
             localStorage.setItem(DREAM_STORAGE_KEY, JSON.stringify(state));
         } catch (e) {
             console.warn('[DreamMode] Error saving state:', e);
+        }
+    },
+
+    /**
+     * Hydrate state from remote server
+     * Merges remote dreams with local dreams
+     */
+    hydrateFromServer: async (): Promise<void> => {
+        const remoteDreams = await fetchDreamsFromRemote();
+        if (remoteDreams.length === 0) return;
+
+        const state = DreamModeService.getState();
+        const existingIds = new Set(state.dreamEntries.map(d => d.id));
+        let addedCount = 0;
+
+        for (const dream of remoteDreams) {
+            if (!existingIds.has(dream.id)) {
+                state.dreamEntries.push(dream);
+                existingIds.add(dream.id);
+                addedCount++;
+            }
+        }
+
+        if (addedCount > 0) {
+            // Sort by timestamp desc
+            state.dreamEntries.sort((a, b) => b.timestamp - a.timestamp);
+            state.dreamEntries = state.dreamEntries.slice(0, 100); // Keep last 100
+            DreamModeService.saveState(state);
+            console.log(`[DreamMode] 💧 Hydrated ${addedCount} dreams from server`);
         }
     },
 

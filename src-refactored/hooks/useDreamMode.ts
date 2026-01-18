@@ -36,12 +36,23 @@ export const useDreamMode = ({
 
     const activityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const dreamIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    
+
+    // 💧 Hydrate dreams from server on mount
+    useEffect(() => {
+        DreamModeService.hydrateFromServer().then(() => {
+            // Refresh state after hydration
+            const state = DreamModeService.getState();
+            setAllDreams(state.dreamEntries);
+            const unread = DreamModeService.getUnreadDreams();
+            setUnreadDreams(unread);
+        });
+    }, []);
+
     // 🔧 FIX: Use refs to avoid circular dependency in useCallback
     const agentsRef = useRef(agents);
     const apiKeyRef = useRef(apiKey);
     const vectorDocumentsRef = useRef(vectorDocuments);
-    
+
     // Keep refs in sync
     useEffect(() => {
         agentsRef.current = agents;
@@ -54,7 +65,7 @@ export const useDreamMode = ({
         const currentAgents = agentsRef.current;
         const currentApiKey = apiKeyRef.current;
         const currentVectorDocs = vectorDocumentsRef.current;
-        
+
         if (currentAgents.length === 0 || !currentApiKey) {
             console.log('[DreamMode] ⚠️ Cannot generate dream: no agents or no API key');
             return;
