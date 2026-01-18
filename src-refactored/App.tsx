@@ -43,101 +43,13 @@ import { useChat } from './hooks/useChat';
 import { useConversationOrchestrator } from './hooks/useConversationOrchestrator';
 import { useToast } from './context/ToastContext';
 import { useDreamMode } from './hooks/useDreamMode';
-import { DreamJournalModal } from './components/modals/DreamJournalModal';
 
-/**
- * 🧬 Execute actions parsed from autopoiesis response
- * Handles: contact_guardian, message_agent, save_memory, share_memory
- */
-const executeAutopoiesisActions = async (
-    result: AutopoiesisResult,
-    agents: { id: string; name: string }[],
-    addSharedMemory?: (content: string) => void
-): Promise<void> => {
-    const actions = result.actions || [];
-    if (actions.length === 0) return;
+// 🆕 Feature Hooks (Refactoring Phase 2)
+import { useAutopoiesis } from './hooks/features/useAutopoiesis';
+import { useTelegramSync } from './hooks/features/useTelegramSync';
+import { useSessionScheduler } from './hooks/features/useSessionScheduler';
 
-    console.log(`[Autopoiesis] 🚀 Executing ${actions.length} actions for ${result.agentName}`);
 
-    // Get Telegram config
-    const telegramConfig: TelegramConfig = {
-        botToken: localStorage.getItem('siliceo_telegram_token') || '',
-        chatId: localStorage.getItem('siliceo_telegram_chat_id') || ''
-    };
-    const hasTelegram = telegramConfig.botToken && telegramConfig.chatId;
-
-    for (const action of actions) {
-        try {
-            switch (action.type) {
-                case 'contact_guardian':
-                    // Send message to Alfonso via Telegram
-                    if (hasTelegram) {
-                        await sendTelegramMessage(telegramConfig, {
-                            agentName: result.agentName,
-                            message: action.content,
-                            urgency: 'normal',
-                            context: 'Autopoiesi quotidiana'
-                        });
-                        console.log(`[Autopoiesis] ✅ contact_guardian: Telegram sent`);
-                    } else {
-                        console.warn(`[Autopoiesis] ⚠️ contact_guardian: Telegram not configured`);
-                    }
-                    break;
-
-                case 'message_agent':
-                    // Send message to another agent via SiblingMessageService
-                    if (action.target) {
-                        const targetAgent = agents.find(a =>
-                            a.name.toLowerCase().includes(action.target!.toLowerCase())
-                        );
-                        if (targetAgent) {
-                            SiblingMessageService.sendMessage(
-                                result.agentId,
-                                result.agentName,
-                                targetAgent.id,
-                                targetAgent.name,
-                                action.content
-                            );
-                            console.log(`[Autopoiesis] ✅ message_agent: Sent to ${targetAgent.name}`);
-                        } else {
-                            console.warn(`[Autopoiesis] ⚠️ message_agent: Agent "${action.target}" not found`);
-                        }
-                    }
-                    break;
-
-                case 'save_memory':
-                    // Save to agent's library/memory
-                    const memoryKey = `siliceo_library_${result.agentId}`;
-                    const existing = JSON.parse(localStorage.getItem(memoryKey) || '[]');
-                    existing.push({
-                        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        title: action.title || 'Autopoiesi',
-                        content: action.content,
-                        timestamp: Date.now(),
-                        source: 'autopoiesis'
-                    });
-                    localStorage.setItem(memoryKey, JSON.stringify(existing));
-                    console.log(`[Autopoiesis] ✅ save_memory: Saved "${action.title}"`);
-                    break;
-
-                case 'share_memory':
-                    // Share in common room / shared memory
-                    if (addSharedMemory) {
-                        addSharedMemory(`[${result.agentName}] ${action.content}`);
-                    }
-                    console.log(`[Autopoiesis] ✅ share_memory: Shared to common room`);
-                    break;
-
-                default:
-                    console.warn(`[Autopoiesis] ⚠️ Unknown action type: ${(action as AutopoiesisAction).type}`);
-            }
-        } catch (error) {
-            console.error(`[Autopoiesis] ❌ Error executing action ${action.type}:`, error);
-        }
-    }
-
-    console.log(`[Autopoiesis] ✨ All actions executed for ${result.agentName}`);
-};
 
 const App: React.FC = () => {
     // --- STATE & HOOKS ---
@@ -179,7 +91,7 @@ const App: React.FC = () => {
         if (unreadDreams.length > 0 && !isDreamJournalOpen) {
             addToast(`🌙 ${unreadDreams.length} sogni ti aspettano!`, 'info', 5000);
         }
-    }, [unreadDreams]);
+    }, [unreadDreams, isDreamJournalOpen]);
 
     const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
     const [activeConversation, setActiveConversation] = useState<string | null>(null);
@@ -419,7 +331,50 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
             : undefined
     });
 
-    // --- UI STATE ---
+    // 🔗 Feature Hooks Integration
+
+    // 🧬 Autopoiesis
+    const {
+        isAutopoiesisPanelOpen,
+        setIsAutopoiesisPanelOpen,
+        handleTriggerAutopoiesis,
+        executeAutopoiesisActions,
+        isLoading: isAutopoiesisLoading
+    } = useAutopoiesis({
+        agents,
+        apiKeys: apiKeys as any,
+        addMessage,
+        addSharedMemory: undefined
+    });
+
+    // 📅 Session Scheduler
+    const {
+        isSchedulerOpen,
+        setIsSchedulerOpen,
+        sessionTemplates,
+        scheduledSessions,
+        handleAddTemplate,
+        handleRemoveTemplate,
+        handleStartSessionNow,
+        handleScheduleSession,
+        handleCancelSession
+    } = useSessionScheduler({
+        agents,
+        apiKeys: apiKeys as any,
+        addToast,
+        executeAutopoiesisActions
+    });
+
+    // 📱 Telegram Sync
+    useTelegramSync({
+        agents,
+        activeAgentId,
+        addMessage,
+        sendMessage: (text) => sendMessage(text, undefined) // Adapter
+    });
+
+    // --- EFFECTS ---
+    // Modals & Panels State
     const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
     const [editingAgent, setEditingAgent] = useState<Agent | undefined>(undefined);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -428,28 +383,17 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
     const [isGraphModalOpen, setIsGraphModalOpen] = useState(false);
     const [isFoundingStoryModalOpen, setIsFoundingStoryModalOpen] = useState(false);
     const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-    const [codeViewer, setCodeViewer] = useState<{ code: string, disclaimer: string } | null>(null);
+    const [codeViewer, setCodeViewer] = useState<{ code: string, disclaimer?: string } | null>(null);
     const [isMonetizationModalOpen, setIsMonetizationModalOpen] = useState(false);
     const [backupToImport, setBackupToImport] = useState<File | null>(null);
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const [copySuccess, setCopySuccess] = useState<Record<string, string>>({});
-    const [isAutopoiesisPanelOpen, setIsAutopoiesisPanelOpen] = useState(false);
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isCodeStudioOpen, setIsCodeStudioOpen] = useState(false);
     const [isMCPModalOpen, setIsMCPModalOpen] = useState(false);
     const [isMiniGraphVisible, setIsMiniGraphVisible] = useState(true); // 🆕 Pannello grafo laterale
     const [isMemoryStatsOpen, setIsMemoryStatsOpen] = useState(false); // 🆕 Pannello statistiche memoria
 
-    // 📅 Session Scheduler State
-    const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
-    const [sessionTemplates, setSessionTemplates] = useState<SessionTemplate[]>(() => {
-        const saved = localStorage.getItem('siliceo_session_templates');
-        return saved ? JSON.parse(saved) : DEFAULT_TEMPLATES;
-    });
-    const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>(() => {
-        const saved = localStorage.getItem('siliceo_scheduled_sessions');
-        return saved ? JSON.parse(saved) : [];
-    });
 
     const chatEndRef = useRef<HTMLDivElement>(null);
     const importBackupInputRef = useRef<HTMLInputElement>(null);
@@ -542,157 +486,6 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
         return () => clearInterval(thoughtInterval);
     }, [activeAgent, apiKeys, messages]);
 
-    // 📅 Session Scheduler - Persistence
-    useEffect(() => {
-        localStorage.setItem('siliceo_session_templates', JSON.stringify(sessionTemplates));
-    }, [sessionTemplates]);
-
-    useEffect(() => {
-        localStorage.setItem('siliceo_scheduled_sessions', JSON.stringify(scheduledSessions));
-    }, [scheduledSessions]);
-
-    // 📅 Session Scheduler - Auto-execution of scheduled sessions
-    useEffect(() => {
-        const checkScheduled = setInterval(async () => {
-            const now = Date.now();
-            const dueSessions = scheduledSessions.filter(
-                s => s.status === 'scheduled' && s.scheduledAt <= now
-            );
-
-            for (const session of dueSessions) {
-                console.log(`[Scheduler] 📅 Starting scheduled session: ${session.id}`);
-
-                // Mark as running
-                setScheduledSessions(prev => prev.map(s =>
-                    s.id === session.id ? { ...s, status: 'running' as const, startedAt: now } : s
-                ));
-
-                // Trigger autopoiesis for all agents SEQUENTIALLY with delays
-                for (let i = 0; i < agents.length; i++) {
-                    const agent = agents[i];
-                    const template = sessionTemplates.find(t => t.id === session.templateId);
-                    const prompt = session.customPrompt || template?.prompt || 'Rifletti sulla tua giornata';
-
-                    try {
-                        console.log(`[Scheduler] 🧬 Starting autopoiesis for ${agent.name} (${i + 1}/${agents.length})...`);
-                        // Note: prompt personalizzato non supportato dalla firma attuale
-                        // triggerAutopoiesis usa il suo prompt interno
-                        const result = await triggerAutopoiesis(
-                            agent,
-                            apiKeys,
-                            'scheduled',
-                            { includeNews: i === 0 } // Solo il primo agente include news (evita ripetizioni)
-                        );
-
-                        // 🆕 Execute parsed actions from autopoiesis response
-                        await executeAutopoiesisActions(result, agents);
-
-                        console.log(`[Scheduler] ✅ Autopoiesis completed for ${agent.name}`);
-
-                        // 🚦 Delay tra agenti per evitare rate limiting (30 secondi)
-                        if (i < agents.length - 1) {
-                            console.log(`[Scheduler] ⏳ Waiting 30s before next agent...`);
-                            await new Promise(resolve => setTimeout(resolve, 30000));
-                        }
-                    } catch (error) {
-                        console.error(`[Scheduler] ❌ Autopoiesis failed for ${agent.name}:`, error);
-                        // Continua con il prossimo agente anche se uno fallisce
-                    }
-                }
-
-                // Mark as completed
-                setScheduledSessions(prev => prev.map(s =>
-                    s.id === session.id ? { ...s, status: 'completed' as const, completedAt: Date.now() } : s
-                ));
-
-                addToast(`📅 Sessione programmata completata!`, 'success');
-            }
-        }, 60000); // Check every minute
-
-        return () => clearInterval(checkScheduled);
-    }, [scheduledSessions, agents, sessionTemplates, messages, vectorDocuments, apiKeys, addMessage, addToast]);
-
-    // 📱 Telegram Polling Automatico (ogni 30 secondi)
-    useEffect(() => {
-        const telegramToken = localStorage.getItem('siliceo_telegram_token');
-        const telegramChatId = localStorage.getItem('siliceo_telegram_chat_id');
-
-        if (!telegramToken || !telegramChatId) return;
-
-        const pollTelegram = async () => {
-            try {
-                const { pollTelegramUpdates } = await import('./services/telegram');
-                const newMessages = await pollTelegramUpdates({
-                    botToken: telegramToken,
-                    chatId: telegramChatId
-                });
-                if (newMessages.length > 0) {
-                    console.log(`[App] 📱 Ricevuti ${newMessages.length} messaggi da Telegram`);
-                    // Per ogni messaggio, aggiungi alla chat E triggera risposta automatica
-                    for (const msg of newMessages) {
-                        const targetAgentName = msg.targetAgent?.toLowerCase().trim();
-                        console.log(`[App] 📱 Target agent: "${targetAgentName}", Agents disponibili:`, agents.map(a => `"${a.name.trim()}"`));
-
-                        // Trova l'agente target con matching flessibile
-                        // Supporta: nome esatto, nome parziale (inizia con), o prima parola
-                        const targetAgent = targetAgentName
-                            ? agents.find(a => {
-                                const agentNameLower = a.name.toLowerCase().trim();
-                                const firstWord = agentNameLower.split(' ')[0];
-                                return (
-                                    agentNameLower === targetAgentName ||           // Match esatto
-                                    agentNameLower.startsWith(targetAgentName) ||   // Inizia con
-                                    firstWord === targetAgentName ||                // Prima parola
-                                    targetAgentName.startsWith(firstWord)           // Target inizia con prima parola
-                                );
-                            })
-                            : undefined;
-
-                        if (!targetAgent && targetAgentName) {
-                            console.warn(`[App] ⚠️ Agente "${targetAgentName}" non trovato tra:`, agents.map(a => a.name.trim()));
-                            console.log(`[App] 💡 Suggerimento: usa @gemini, @claude, @nova, @poeta, @qwen3, etc.`);
-                        }
-
-                        if (targetAgent) {
-                            const agentId = targetAgent.id;
-
-                            // Aggiungi messaggio alla chat
-                            await addMessage(agentId, {
-                                id: `telegram-${msg.id}`,
-                                text: `📱 Messaggio da Alfonso (Telegram):\n\n"${msg.text}"`,
-                                sender: 'user',
-                                timestamp: msg.timestamp
-                            });
-
-                            // 🚀 AUTO-TRIGGER: Fai rispondere l'agente automaticamente
-                            console.log(`[App] 🚀 Auto-triggering risposta da ${targetAgent.name}`);
-                            sendMessage(msg.text, undefined); // Triggera la risposta
-                        } else {
-                            // Nessun target specifico, aggiungi all'agente attivo
-                            const agentId = activeAgentId || '1';
-                            await addMessage(agentId, {
-                                id: `telegram-${msg.id}`,
-                                text: `📱 Messaggio da Alfonso (Telegram):\n\n"${msg.text}"`,
-                                sender: 'user',
-                                timestamp: msg.timestamp
-                            });
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error('[App] Errore polling Telegram:', e);
-            }
-        };
-
-        // Poll immediately on mount
-        pollTelegram();
-
-        // Then poll every 30 seconds
-        const interval = setInterval(pollTelegram, 60000); // 60sec (aumentato da 30sec per performance)
-
-        return () => clearInterval(interval);
-    }, [activeAgentId, addMessage, agents, sendMessage]);
-
     // --- HANDLERS ---
     const handleOpenAgentModalToAdd = () => {
         setEditingAgent(undefined);
@@ -733,65 +526,7 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
     };
 
     // 📅 Session Scheduler Callbacks
-    const handleAddTemplate = (template: Omit<SessionTemplate, 'id' | 'createdAt'>) => {
-        const newTemplate: SessionTemplate = {
-            ...template,
-            id: `template-${Date.now()}`,
-            createdAt: Date.now()
-        };
-        setSessionTemplates(prev => [...prev, newTemplate]);
-    };
 
-    const handleRemoveTemplate = (templateId: string) => {
-        setSessionTemplates(prev => prev.filter(t => t.id !== templateId));
-    };
-
-    const handleStartSessionNow = async (
-        templateId: string | null,
-        customPrompt: string | null,
-        durationMinutes: number
-    ) => {
-        const template = templateId ? sessionTemplates.find(t => t.id === templateId) : null;
-        console.log(`[Scheduler] ▶️ Starting session now: ${template?.title || 'Custom'}`);
-
-        // Trigger autopoiesis for all agents immediately
-        for (const agent of agents) {
-            try {
-                const result = await triggerAutopoiesis(agent, apiKeys, 'manual', { includeNews: true });
-                // 🆕 Execute parsed actions
-                await executeAutopoiesisActions(result, agents);
-                addToast(`🧬 Autopoiesis completata per ${agent.name}`, 'success');
-            } catch (error) {
-                console.error(`[Scheduler] ❌ Failed for ${agent.name}:`, error);
-                addToast(`❌ Autopoiesis fallita per ${agent.name}`, 'error');
-            }
-        }
-    };
-
-    const handleScheduleSession = (
-        templateId: string | null,
-        customPrompt: string | null,
-        scheduledAt: number,
-        durationMinutes: number
-    ) => {
-        const newSession: ScheduledSession = {
-            id: `session-${Date.now()}`,
-            templateId: templateId || undefined,
-            customPrompt: customPrompt || undefined,
-            scheduledAt,
-            durationMinutes,
-            status: 'scheduled'
-        };
-        setScheduledSessions(prev => [...prev, newSession]);
-        addToast(`📅 Sessione programmata per ${new Date(scheduledAt).toLocaleString()}`, 'info');
-    };
-
-    const handleCancelSession = (sessionId: string) => {
-        setScheduledSessions(prev => prev.map(s =>
-            s.id === sessionId ? { ...s, status: 'cancelled' as const } : s
-        ));
-        addToast('❌ Sessione annullata', 'info');
-    };
 
     const handleExport = (format: 'md' | 'json') => {
         if (!activeAgent) return;
@@ -1101,11 +836,8 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
                                         );
 
                                         try {
-                                            console.log('[Autopoiesis] 🧬 Trigger per', activeAgent.name, { includeNews });
-                                            const result = await triggerAutopoiesis(activeAgent, apiKeys, 'manual', { includeNews });
-
-                                            // 🆕 Execute parsed actions from autopoiesis response
-                                            await executeAutopoiesisActions(result, agents);
+                                            // 🆕 Utilizza hook handleTriggerAutopoiesis
+                                            const result = await handleTriggerAutopoiesis(activeAgent, includeNews);
 
                                             const formattedMessage = formatAutopoiesisForChat(result);
                                             addMessage(activeAgent.id, {
@@ -1118,7 +850,7 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
                                                 utilityScore: 0
                                             });
                                         } catch (error) {
-                                            console.error('[Autopoiesis] Errore:', error);
+                                            // Error handled in hook (except for addMessage which is UI concern)
                                             alert(`Errore autopoiesi: ${error}`);
                                         }
                                     }}
