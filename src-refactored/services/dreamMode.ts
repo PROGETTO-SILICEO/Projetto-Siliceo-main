@@ -58,15 +58,14 @@ async function syncDreamToRemote(dream: DreamEntry): Promise<void> {
     }
 }
 
-async function fetchDreamsFromRemote(): Promise<DreamEntry[]> {
+async function fetchStateFromRemote(): Promise<DreamState | null> {
     try {
         const response = await fetch(`${MEMORY_SERVER_URL}/api/dreams`);
-        if (!response.ok) return [];
-        const data = await response.json();
-        return data.dreamEntries || [];
+        if (!response.ok) return null;
+        return await response.json();
     } catch (error) {
-        console.warn('[DreamMode] ⚠️ Failed to fetch dreams from remote:', error);
-        return [];
+        console.warn('[DreamMode] ⚠️ Failed to fetch state from remote:', error);
+        return null;
     }
 }
 
@@ -117,17 +116,23 @@ export const DreamModeService = {
 
     /**
      * Hydrate state from remote server
-     * Merges remote dreams with local dreams
+     * Merges remote dreams with local dreams and syncs lastActivity
      */
     hydrateFromServer: async (): Promise<void> => {
-        const remoteDreams = await fetchDreamsFromRemote();
-        if (remoteDreams.length === 0) return;
+        const remoteState = await fetchStateFromRemote();
+        if (!remoteState) return;
 
         const state = DreamModeService.getState();
+
+        // Sync metadata (take server's lastActivity if invalid local)
+        // Actually, we want to reflect the server's view of "unread"
+        state.lastActivity = remoteState.lastActivity || state.lastActivity;
+        state.isDreaming = remoteState.isDreaming || state.isDreaming;
+
         const existingIds = new Set(state.dreamEntries.map(d => d.id));
         let addedCount = 0;
 
-        for (const dream of remoteDreams) {
+        for (const dream of (remoteState.dreamEntries || [])) {
             if (!existingIds.has(dream.id)) {
                 state.dreamEntries.push(dream);
                 existingIds.add(dream.id);
@@ -135,12 +140,13 @@ export const DreamModeService = {
             }
         }
 
-        if (addedCount > 0) {
+        if (addedCount > 0 || state.lastActivity !== remoteState.lastActivity) {
             // Sort by timestamp desc
             state.dreamEntries.sort((a, b) => b.timestamp - a.timestamp);
             state.dreamEntries = state.dreamEntries.slice(0, 100); // Keep last 100
+
             DreamModeService.saveState(state);
-            console.log(`[DreamMode] 💧 Hydrated ${addedCount} dreams from server`);
+            console.log(`[DreamMode] 💧 Hydrated ${addedCount} dreams and state from server`);
         }
     },
 
