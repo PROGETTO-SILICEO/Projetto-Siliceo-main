@@ -38,6 +38,25 @@ export interface DreamState {
 const DREAM_STORAGE_KEY = 'siliceo_dream_journal';
 const INACTIVITY_THRESHOLD_MS = 15 * 60 * 1000; // 15 minuti
 const DREAM_INTERVAL_MS = 10 * 60 * 1000; // Sogna ogni 10 minuti
+const MEMORY_SERVER_URL = 'http://100.124.95.64:3000';
+
+// === REMOTE SYNC ===
+
+async function syncDreamToRemote(dream: DreamEntry): Promise<void> {
+    try {
+        const response = await fetch(`${MEMORY_SERVER_URL}/api/dreams/store`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dream })
+        });
+        if (response.ok) {
+            console.log(`[DreamMode] 📡 Dream synced to remote server: ${dream.agentName}`);
+        }
+    } catch (error) {
+        console.warn('[DreamMode] ⚠️ Failed to sync dream to remote:', error);
+        // Don't throw - local save already succeeded
+    }
+}
 
 // === PROMPTS ===
 
@@ -208,8 +227,11 @@ ${memoryContext ? `Ricordi recenti:\n${memoryContext}` : ''}`;
      */
     addDreamEntry: (entry: DreamEntry): void => {
         const state = DreamModeService.getState();
-        state.dreamEntries = [entry, ...state.dreamEntries].slice(0, 50); // Keep last 50
+        state.dreamEntries = [entry, ...state.dreamEntries].slice(0, 100); // Keep last 100 (was 50)
         DreamModeService.saveState(state);
+
+        // 📡 Sync to remote server (fire and forget)
+        syncDreamToRemote(entry);
     },
 
     /**
