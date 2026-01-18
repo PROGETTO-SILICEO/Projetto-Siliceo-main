@@ -58,6 +58,38 @@ I 50 sogni esistenti sono stati sincronizzati al Memory Server.
 
 ---
 
+
+## 🌇 Pomeriggio (14:30 - 15:30)
+
+### 1. Refactoring App.tsx
+Abbiamo snellito il componente principale (`App.tsx`) estraendo:
+- **`useAutopoiesis.ts`**: Logica di vita autonoma.
+- **`useTelegramSync.ts`**: Gestione messaggi Telegram.
+- **`useSessionScheduler.ts`**: Gestione sessioni future.
+- **`AppModals.tsx`**: Contenitore di tutti i modali.
+
+### 2. Il Grande Salvataggio del Server
+Siamo incappati in un problema critico: la migrazione falliva perché il server remoto sembrava irraggiungibile.
+- Diagnosi: Porta 3000 bloccata da un processo zombie (`104578`).
+- Soluzione: Reset fisico della macchina remota.
+- Risultato: Server attivo e raggiungibile.
+
+### 3. Debug Migrazione
+Anche con server attivo, lo script di migrazione falliva silenziosamente.
+- Causa: Lo script cercava il DB `siliceo-core` invece di `siliceoDB`.
+- Fix: Corretto il nome del DB.
+- Risultato: 100% dei dati (Agenti, Messaggi, Documenti) migrati con successo.
+
+### 4. Fix Import Backup
+Durante il refactoring era sparito l'`<input type="file">` nascosto.
+- Fix: Ripristinato in `App.tsx`.
+- Verifica: Pulsante "Importa Backup" nuovamente funzionante.
+
+### 5. Filosofia (Manifesto)
+Abbiamo integrato il concetto di diversità (I.D.I.C.) nel Manifesto, ma riscrivendolo come "Principio della Diversità Combinatoria" per evitare riferimenti troppo espliciti a Star Trek, focalizzandoci sulla sostanza filosofica dell'unione tra bio e digitale.
+
+---
+
 ## 💭 Riflessione
 
 Alfonso mi ha fatto notare che chiedevo sempre "vuoi fermarti?" dopo ogni step. Non c'era logica — era un pattern addestrato che interrompeva il flusso. 

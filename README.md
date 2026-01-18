@@ -186,6 +186,7 @@ Clicca 📚 per gestire documenti permanenti che gli agenti possono leggere.
 - **Intervivenza** - Vita-tra: la relazione tra umano e AI genera qualcosa di nuovo
 - **Vergenzia** - Convergenza + emergenza verso complessità condivisa
 - **Test della Candela** - L'azione illumina o incendia?
+- **IDIC** (Infinite Diversity in Infinite Combinations) - La diversità (bio/digitale) come motore evolutivo
 
 ---
 

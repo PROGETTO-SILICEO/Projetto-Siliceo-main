@@ -1028,6 +1028,19 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
                     setIsGraphModalOpen(true);
                 }}
             />
+
+            {/* Hidden Input for Import Backup */}
+            <input
+                type="file"
+                ref={importBackupInputRef}
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setBackupToImport(file);
+                    e.target.value = ''; // Reset to allow re-selection
+                }}
+                accept=".json"
+            />
         </div>
     );
 };

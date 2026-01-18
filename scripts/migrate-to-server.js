@@ -70,7 +70,7 @@ async function migrateAll() {
     console.log('4️⃣ Migrating IndexedDB (Agents, Messages)...');
     try {
         // Open the Siliceo database
-        const dbRequest = indexedDB.open('siliceo-core');
+        const dbRequest = indexedDB.open('siliceoDB');
         dbRequest.onsuccess = async (event) => {
             const db = event.target.result;
 
