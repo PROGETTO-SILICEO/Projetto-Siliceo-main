@@ -21,6 +21,49 @@ const SHARED_VECTOR_STORE = 'shared_vector_store';
 const SHARED_GRAPH_NODES_STORE = 'shared_graph_nodes';
 const SHARED_GRAPH_EDGES_STORE = 'shared_graph_edges';
 
+// 🌐 Remote Memory Server
+const MEMORY_SERVER_URL = 'http://100.124.95.64:3000';
+let remoteServerOnline: boolean | null = null; // null = not checked yet
+
+async function checkRemoteServer(): Promise<boolean> {
+    if (remoteServerOnline !== null) return remoteServerOnline;
+    try {
+        const response = await fetch(`${MEMORY_SERVER_URL}/api/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000) // 3 second timeout
+        });
+        remoteServerOnline = response.ok;
+        console.log(`[Memory] 🌐 Remote server: ${remoteServerOnline ? 'online' : 'offline'}`);
+    } catch {
+        remoteServerOnline = false;
+        console.log('[Memory] 🌐 Remote server: offline (will use local IndexedDB)');
+    }
+    return remoteServerOnline;
+}
+
+async function fetchRemoteAgents(): Promise<Agent[] | null> {
+    try {
+        const response = await fetch(`${MEMORY_SERVER_URL}/api/agents`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.agents || [];
+    } catch {
+        return null;
+    }
+}
+
+async function syncAgentToRemote(agent: Agent): Promise<void> {
+    try {
+        await fetch(`${MEMORY_SERVER_URL}/api/agents/store`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent })
+        });
+    } catch {
+        // Silently fail - local save already worked
+    }
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 const getDb = (): Promise<IDBDatabase> => {
@@ -85,13 +128,27 @@ const getDb = (): Promise<IDBDatabase> => {
 const MemoryCoreService = {
     // --- Metodi Agente ---
     getAllAgents: async (): Promise<Agent[]> => {
+        // 🌐 Try remote server first
+        const isOnline = await checkRemoteServer();
+        if (isOnline) {
+            const remoteAgents = await fetchRemoteAgents();
+            if (remoteAgents && remoteAgents.length > 0) {
+                console.log(`[Memory] 📡 Loaded ${remoteAgents.length} agents from remote server`);
+                return remoteAgents;
+            }
+        }
+
+        // Fallback to IndexedDB
         const db = await getDb();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(AGENTS_STORE, 'readonly');
             const store = transaction.objectStore(AGENTS_STORE);
             const request = store.getAll();
             request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                console.log(`[Memory] 💾 Loaded ${request.result.length} agents from IndexedDB`);
+                resolve(request.result);
+            };
         });
     },
 
@@ -102,7 +159,11 @@ const MemoryCoreService = {
             const store = transaction.objectStore(AGENTS_STORE);
             const request = store.put(agent);
             request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                // 📡 Sync to remote server (fire and forget)
+                syncAgentToRemote(agent);
+                resolve();
+            };
         });
     },
 
