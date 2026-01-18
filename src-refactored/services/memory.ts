@@ -76,6 +76,18 @@ async function syncMessageToRemote(conversationId: string, message: Message): Pr
     }
 }
 
+async function syncVectorDocToRemote(agentId: string, doc: VectorDocument): Promise<void> {
+    try {
+        await fetch(`${MEMORY_SERVER_URL}/api/vectors/${agentId}/store`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ document: doc })
+        });
+    } catch {
+        // Silently fail - local save already worked
+    }
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 const getDb = (): Promise<IDBDatabase> => {
@@ -328,7 +340,13 @@ const MemoryCoreService = {
             const store = transaction.objectStore(VECTOR_STORE);
             const request = store.put(doc);
             request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                // 📡 Sync to remote server (fire and forget)
+                if (doc.agentId) {
+                    syncVectorDocToRemote(doc.agentId, doc);
+                }
+                resolve();
+            };
         });
     },
 
