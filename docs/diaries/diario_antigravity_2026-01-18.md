@@ -48,7 +48,13 @@ Nuovi endpoint:
 
 ### Sync completato
 
-I 50 sogni esistenti sono stati sincronizzati al Memory Server. I nuovi sogni vengono salvati automaticamente sia in localStorage che sul server.
+I 50 sogni esistenti sono stati sincronizzati al Memory Server. 
+
+**Auto-sync implementato per:**
+- ✅ Dreams (nuovi sogni)
+- ✅ Agents (quando salvati)
+- ✅ Messages (quando aggiunti)
+- ✅ Vector Documents (privati e shared)
 
 ---
 
