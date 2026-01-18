@@ -17,12 +17,12 @@ import type { Agent, Message } from './types';
 
 // Components
 import {
-    AgentModal, SettingsModal, PriceSettingsModal, CometTestimonyModal,
-    FoundingStoryModal, SecurityModal, SemanticGraphModal, CodeViewerModal,
-    MonetizationModal, ConfirmationModal, EthicalOnboardingModal, VerbositySelector,
-    CommonRoom, CodeStudio, LibraryPanel, MCPPermissionsModal, MemoryStatsPanel,
-    SessionSchedulerModal
+    // Panels (non-modals kept here if needed, or moved) e.g. CommonRoom, CodeStudio (handled in AppModals?)
+    CommonRoom,
+    VerbositySelector
+    // AppModals handles the rest
 } from './components';
+import { AppModals } from './components/layout/AppModals';
 import { DEFAULT_TEMPLATES, type SessionTemplate, type ScheduledSession } from './data/session-templates';
 import { LiveClock } from './components/ui/LiveClock';
 import { triggerAutopoiesis, formatAutopoiesisForChat } from './services/autopoiesis';
@@ -465,9 +465,9 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
         let lastActivity = Date.now();
         const updateActivity = () => { lastActivity = Date.now(); };
 
-        // Listen for user activity
-        window.addEventListener('mousemove', updateActivity);
-        window.addEventListener('keydown', updateActivity);
+        // Listen for user activity (disabled most - too frequent)
+        // window.addEventListener('mousemove', updateActivity); // DISABLED: Performance
+        // window.addEventListener('keydown', updateActivity); // DISABLED: Performance
         window.addEventListener('click', updateActivity);
 
         // Decay ogni 2 ore (era 1 ora, aumentato per performance)
@@ -483,7 +483,7 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
             } catch (error) {
                 console.error('[Memory Curator] Decay failed:', error);
             }
-        }, 2 * 60 * 60 * 1000); // 2 ore
+        }, 4 * 60 * 60 * 1000); // 4 ore (aumentato da 2h per performance)
 
         // Consolidamento quando inattivo da 30 minuti (come il sonno)
         const consolidationInterval = setInterval(async () => {
@@ -503,11 +503,11 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
                 // Reset activity to avoid re-triggering
                 lastActivity = Date.now();
             }
-        }, 5 * 60 * 1000); // Check ogni 5 minuti
+        }, 15 * 60 * 1000); // Check ogni 15 minuti (aumentato da 5min per performance)
 
         return () => {
-            window.removeEventListener('mousemove', updateActivity);
-            window.removeEventListener('keydown', updateActivity);
+            // window.removeEventListener('mousemove', updateActivity); // DISABLED
+            // window.removeEventListener('keydown', updateActivity); // DISABLED
             window.removeEventListener('click', updateActivity);
             clearInterval(decayInterval);
             clearInterval(consolidationInterval);
@@ -537,7 +537,7 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
                     console.error('[Inner Thoughts] Failed to generate:', error);
                 }
             }
-        }, 5 * 60 * 1000); // Every 5 minutes
+        }, 30 * 60 * 1000); // Every 30 minutes (aumentato da 5min per performance)
 
         return () => clearInterval(thoughtInterval);
     }, [activeAgent, apiKeys, messages]);
@@ -688,7 +688,7 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
         pollTelegram();
 
         // Then poll every 30 seconds
-        const interval = setInterval(pollTelegram, 30000);
+        const interval = setInterval(pollTelegram, 60000); // 60sec (aumentato da 30sec per performance)
 
         return () => clearInterval(interval);
     }, [activeAgentId, addMessage, agents, sendMessage]);
@@ -858,124 +858,97 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
 
     return (
         <div className="h-screen w-screen flex bg-gray-900 text-gray-200 font-sans">
-            {showOnboarding && <EthicalOnboardingModal onComplete={completeOnboarding} onOpenSecurityModal={() => setIsSecurityModalOpen(true)} />}
-
-            {/* Hidden Input for Import */}
-            <input type="file" ref={importBackupInputRef} className="hidden" accept=".json" onChange={handleFileSelectForImport} />
-
-            {/* Modals */}
-            {isAgentModalOpen && <AgentModal onSave={handleSaveAgent} onClose={() => setIsAgentModalOpen(false)} agentToEdit={editingAgent} />}
-            {isSettingsModalOpen && <SettingsModal onSave={saveKeys} onClose={() => setIsSettingsModalOpen(false)} currentKeys={apiKeys} />}
-            {isPriceModalOpen && <PriceSettingsModal currentPrices={modelPrices} onSave={savePrices} onClose={() => setIsPriceModalOpen(false)} />}
-            {isCometModalOpen && <CometTestimonyModal onClose={() => setIsCometModalOpen(false)} />}
-            {isGraphModalOpen && <SemanticGraphModal onClose={() => setIsGraphModalOpen(false)} messages={messages[activeAgentId || ''] || []} />}
-            {isFoundingStoryModalOpen && <FoundingStoryModal onClose={() => setIsFoundingStoryModalOpen(false)} />}
-            {isSecurityModalOpen && <SecurityModal onClose={() => setIsSecurityModalOpen(false)} />}
-            {codeViewer && <CodeViewerModal code={codeViewer.code} filename="memory_core.py" onClose={() => setCodeViewer(null)} disclaimer={codeViewer.disclaimer} />}
-            {SHOW_MONETIZATION && isMonetizationModalOpen && <MonetizationModal onClose={() => setIsMonetizationModalOpen(false)} />}
-            {backupToImport && <ConfirmationModal onConfirm={confirmAndProcessImport} onCancel={() => setBackupToImport(null)} fileName={backupToImport.name} />}
-            {isAutopoiesisPanelOpen && activeAgent && (
-                <AutopoiesisPanel
-                    agentId={activeAgent.id}
-                    agentName={activeAgent.name}
-                    onClose={() => setIsAutopoiesisPanelOpen(false)}
-                />
-            )}
-            {/* Library Panel */}
-            <LibraryPanel
-                isOpen={isLibraryOpen}
-                onClose={() => setIsLibraryOpen(false)}
+            {/* Modals & Panels encapsulated in AppModals */}
+            <AppModals
+                showOnboarding={showOnboarding}
+                completeOnboarding={completeOnboarding}
+                setIsSecurityModalOpen={setIsSecurityModalOpen}
+                isAgentModalOpen={isAgentModalOpen}
+                handleSaveAgent={handleSaveAgent}
+                setIsAgentModalOpen={setIsAgentModalOpen}
+                editingAgent={editingAgent}
+                isSettingsModalOpen={isSettingsModalOpen}
+                saveKeys={saveKeys}
+                setIsSettingsModalOpen={setIsSettingsModalOpen}
+                apiKeys={apiKeys}
+                isPriceModalOpen={isPriceModalOpen}
+                modelPrices={modelPrices}
+                savePrices={savePrices}
+                setIsPriceModalOpen={setIsPriceModalOpen}
+                isCometModalOpen={isCometModalOpen}
+                setIsCometModalOpen={setIsCometModalOpen}
+                isGraphModalOpen={isGraphModalOpen}
+                setIsGraphModalOpen={setIsGraphModalOpen}
+                messages={messages}
+                activeAgentId={activeAgentId}
+                isFoundingStoryModalOpen={isFoundingStoryModalOpen}
+                setIsFoundingStoryModalOpen={setIsFoundingStoryModalOpen}
+                isSecurityModalOpen={isSecurityModalOpen}
+                codeViewer={codeViewer}
+                setCodeViewer={setCodeViewer}
+                isMonetizationModalOpen={isMonetizationModalOpen}
+                setIsMonetizationModalOpen={setIsMonetizationModalOpen}
+                backupToImport={backupToImport}
+                confirmAndProcessImport={confirmAndProcessImport}
+                setBackupToImport={setBackupToImport}
+                isAutopoiesisPanelOpen={isAutopoiesisPanelOpen}
+                activeAgent={activeAgent}
+                setIsAutopoiesisPanelOpen={setIsAutopoiesisPanelOpen}
+                isLibraryOpen={isLibraryOpen}
+                setIsLibraryOpen={setIsLibraryOpen}
                 agents={agents}
-            />
-            {/* Memory Stats Panel */}
-            <MemoryStatsPanel
-                agents={agents}
+                isMemoryStatsOpen={isMemoryStatsOpen}
+                setIsMemoryStatsOpen={setIsMemoryStatsOpen}
                 vectorDocuments={vectorDocuments}
                 sharedDocuments={sharedDocuments}
-                isVisible={isMemoryStatsOpen}
-                onToggle={() => setIsMemoryStatsOpen(prev => !prev)}
-            />
-            {/* Dream Journal Modal */}
-            <DreamJournalModal
-                isOpen={isDreamJournalOpen}
-                onClose={() => {
-                    setIsDreamJournalOpen(false);
-                    dismissDreams();
+                isDreamJournalOpen={isDreamJournalOpen}
+                setIsDreamJournalOpen={setIsDreamJournalOpen}
+                dismissDreams={dismissDreams}
+                allDreams={allDreams}
+                isSchedulerOpen={isSchedulerOpen}
+                setIsSchedulerOpen={setIsSchedulerOpen}
+                sessionTemplates={sessionTemplates}
+                scheduledSessions={scheduledSessions}
+                handleAddTemplate={handleAddTemplate}
+                handleRemoveTemplate={handleRemoveTemplate}
+                handleStartSessionNow={handleStartSessionNow}
+                handleScheduleSession={handleScheduleSession}
+                handleCancelSession={handleCancelSession}
+                isMCPModalOpen={isMCPModalOpen}
+                setIsMCPModalOpen={setIsMCPModalOpen}
+                isCodeStudioOpen={isCodeStudioOpen}
+                setIsCodeStudioOpen={setIsCodeStudioOpen}
+                onSaveToMemory={async (agentId, text) => {
+                    try {
+                        const { EmbeddingService } = await import('./services/vector');
+                        const { generateId } = await import('./utils/generateId');
+                        const MemoryCoreService = (await import('./services/memory')).default;
+
+                        await EmbeddingService.getInstance().init();
+                        const embedding = await EmbeddingService.getInstance().embed(text);
+
+                        const doc = {
+                            id: generateId(),
+                            agentId,
+                            name: `[Code Studio] ${text.substring(0, 30)}...`,
+                            content: text,
+                            embedding,
+                            utilityScore: 0,
+                            timestamp: Date.now(),
+                            scope: 'private' as const
+                        };
+
+                        await MemoryCoreService.saveDocument(doc);
+                        setVectorDocuments(prev => ({
+                            ...prev,
+                            [agentId]: [...(prev[agentId] || []), doc]
+                        }));
+                        console.log(`[App] Code Studio message saved to memory for agent ${agentId}`);
+                    } catch (e) {
+                        console.error('[App] Failed to save Code Studio message:', e);
+                    }
                 }}
-                dreams={allDreams}
             />
-            {/* Dream Mode Button - always visible */}
-            <button
-                onClick={() => setIsDreamJournalOpen(true)}
-                className={`fixed bottom-4 left-4 ${isDreaming || unreadDreams.length > 0 ? 'bg-purple-600 hover:bg-purple-700 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white p-3 rounded-full shadow-lg z-50 transition-all`}
-                title={isDreaming ? "Gli agenti stanno sognando..." : unreadDreams.length > 0 ? `${unreadDreams.length} nuovi sogni` : "Dream Journal"}
-            >
-                🌙
-                {unreadDreams.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                        {unreadDreams.length}
-                    </span>
-                )}
-            </button>
-            {/* 📅 Session Scheduler Modal */}
-            {isSchedulerOpen && (
-                <SessionSchedulerModal
-                    onClose={() => setIsSchedulerOpen(false)}
-                    templates={sessionTemplates}
-                    scheduledSessions={scheduledSessions}
-                    onAddTemplate={handleAddTemplate}
-                    onRemoveTemplate={handleRemoveTemplate}
-                    onStartNow={handleStartSessionNow}
-                    onSchedule={handleScheduleSession}
-                    onCancelSession={handleCancelSession}
-                />
-            )}
-            <MCPPermissionsModal
-                isOpen={isMCPModalOpen}
-                onClose={() => setIsMCPModalOpen(false)}
-                agents={agents}
-            />
-            {/* Code Studio */}
-            {isCodeStudioOpen && (
-                <CodeStudio
-                    onClose={() => setIsCodeStudioOpen(false)}
-                    agents={agents}
-                    apiKeys={apiKeys}
-                    vectorDocuments={vectorDocuments}
-                    sharedDocuments={sharedDocuments}
-                    onSaveToMemory={async (agentId, text) => {
-                        // 🆕 Salva messaggio Code Studio in memoria privata agente
-                        try {
-                            const { EmbeddingService } = await import('./services/vector');
-                            const { generateId } = await import('./utils/generateId');
-                            const MemoryCoreService = (await import('./services/memory')).default;
-
-                            await EmbeddingService.getInstance().init();
-                            const embedding = await EmbeddingService.getInstance().embed(text);
-
-                            const doc = {
-                                id: generateId(),
-                                agentId,
-                                name: `[Code Studio] ${text.substring(0, 30)}...`,
-                                content: text,
-                                embedding,
-                                utilityScore: 0,
-                                timestamp: Date.now(),
-                                scope: 'private' as const
-                            };
-
-                            await MemoryCoreService.saveDocument(doc);
-                            setVectorDocuments(prev => ({
-                                ...prev,
-                                [agentId]: [...(prev[agentId] || []), doc]
-                            }));
-                            console.log(`[App] Code Studio message saved to memory for agent ${agentId}`);
-                        } catch (e) {
-                            console.error('[App] Failed to save Code Studio message:', e);
-                        }
-                    }}
-                />
-            )}
 
             {/* Sidebar */}
             <aside className="w-1/4 bg-gray-800 p-4 flex flex-col border-r border-gray-700">

@@ -31,4 +31,9 @@ export { default as MemoryStatsPanel } from './panels/MemoryStatsPanel';
 export { MCPPermissionsModal } from './modals/MCPPermissionsModal';
 
 // Code Studio
+// Code Studio
 export { CodeStudio } from './code/CodeStudio';
+
+// Additional Modals/Panels
+export { AutopoiesisPanel } from './modals/AutopoiesisPanel';
+export { DreamJournalModal } from './modals/DreamJournalModal';
