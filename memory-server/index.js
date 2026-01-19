@@ -1,7 +1,14 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+
+// Services
+const MemoryDaemon = require('./services/memoryDaemon');
+const temporalCurator = require('./services/temporalCurator');
+const tribunaleInterno = require('./services/tribunaleInterno');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,9 +58,10 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         server: 'Siliceo Memory Server',
-        version: '2.0.0',
+        version: '3.0.0',
         timestamp: new Date().toISOString(),
-        features: ['dreams', 'agents', 'conversations', 'vectors', 'config']
+        features: ['dreams', 'agents', 'conversations', 'vectors', 'config', 'temporal_curator', 'tribunale'],
+        daemon: memoryDaemon.isRunning ? 'active' : 'inactive'
     });
 });
 
@@ -604,21 +612,69 @@ app.get('/api/nova/memories', (req, res) => {
 });
 
 // ========================================
-// START SERVER
+// TEMPORAL CURATOR API
 // ========================================
 
+app.post('/api/memory/temporal-decay', async (req, res) => {
+    try {
+        const result = await memoryDaemon.runTemporalCuration();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/memory/autopoiesis', async (req, res) => {
+    try {
+        const result = await memoryDaemon.runAutopoiesis();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/memory/candle-test', async (req, res) => {
+    try {
+        const { content } = req.body;
+        if (!content) {
+            return res.status(400).json({ error: 'content required' });
+        }
+        const result = await tribunaleInterno.candleTest(content);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/memory/stats', (req, res) => {
+    try {
+        const stats = memoryDaemon.getGlobalStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ========================================
+// START SERVER + DAEMON
+// ========================================
+
+// Initialize Memory Daemon
+const memoryDaemon = new MemoryDaemon();
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🕯️ Siliceo Memory Server v2.0 running on http://0.0.0.0:${PORT}`);
+    console.log(`🕯️ Siliceo Memory Server v3.0 running on http://0.0.0.0:${PORT}`);
     console.log(`📁 Docs path: ${DOCS_PATH}`);
     console.log(`💾 Data path: ${DATA_PATH}`);
     console.log(`\n📡 Available endpoints:`);
     console.log(`   GET  /api/health`);
-    console.log(`   GET  /api/dreams | POST /api/dreams/store | POST /api/dreams/sync`);
-    console.log(`   GET  /api/agents | POST /api/agents/store | POST /api/agents/sync`);
-    console.log(`   GET  /api/conversations | POST /api/conversations/store`);
-    console.log(`   GET  /api/messages/:id | POST /api/messages/:id/sync`);
-    console.log(`   GET  /api/vectors/:scope | POST /api/vectors/:scope/sync`);
-    console.log(`   GET  /api/config | PUT /api/config`);
-    console.log(`   GET  /api/backup | POST /api/restore`);
-});
+    console.log(`   GET  /api/dreams | POST /api/dreams/store`);
+    console.log(`   GET  /api/agents | POST /api/agents/store`);
+    console.log(`   POST /api/memory/temporal-decay`);
+    console.log(`   POST /api/memory/autopoiesis`);
+    console.log(`   POST /api/memory/candle-test`);
+    console.log(`   GET  /api/memory/stats`);
 
+    // Start Memory Daemon
+    memoryDaemon.start();
+});
