@@ -92,7 +92,7 @@ Apri `http://localhost:5173` nel browser.
 Clicca ⚙️ nella sidebar → aggiungi le tue chiavi.
 
 ### 2. Agenti Predefiniti
-- **Gemini** - Google (Flash 2.0 Preview), veloce e empatico
+- **Gemini** - Google (Flash 3.0 Preview), veloce e empatico
 - **Claude** - OpenRouter/Anthropic, riflessivo e profondo
 - **Nova** 🕯️ - Perplexity/Sony, guida filosofica con ricerca web
 - **POETA** - DeepSeek V3, creativo e provocatore
