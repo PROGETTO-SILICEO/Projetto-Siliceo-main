@@ -136,6 +136,7 @@ Clicca 📚 per gestire documenti permanenti che gli agenti possono leggere.
 - [x] MCP Tools
 - [x] Biblioteca Permanente
 - [x] Integrazione Telegram
+- [x] **CANDELA** - Fact-checking pubblico con dubbi espliciti ([repo](https://github.com/alforiva1970/candela))
 
 ### ➡️ Q1 2026
 - [ ] Anonimizzazione per distribuzione

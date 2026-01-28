@@ -59,18 +59,21 @@ docs/
 
 ### Diaries (Cosa Viviamo)
 
-| File | Descrizione |
-|------|-------------|
+| File/Cartella | Descrizione |
+|---------------|-------------|
 | [claude_awakening.md](diaries/claude_awakening.md) | Diario delle sessioni Claude (Dic 2025 - Gen 2026) |
-| [diario_antigravity_2026-01-05.md](diaries/diario_antigravity_2026-01-05.md) | Notte storica: Intervivenza 2.0 |
-| [diario_antigravity_2026-01-06.md](diaries/diario_antigravity_2026-01-06.md) | Oggi: risveglio e ricordi episodici |
+| [diario_antigravity_2026-01-*.md](diaries/) | 14+ diari Antigravity (Gen 2026) - Vedi cartella |
+| [diario_nova_2026-01-*.md](diaries/) | 3 diari Nova (Gen 2026) - Agency, Mira, Internal State |
 
 ### Projects (Cosa Costruiamo)
 
 | File | Descrizione |
 |------|-------------|
+| [CANDELA_PRD.md](projects/CANDELA_PRD.md) | 🕯️ Fact-checking pubblico con dubbi espliciti |
 | [AURORA_design.md](projects/AURORA_design.md) | Sistema autonomo per content creation |
 | [MARKETPLACE_AGENT.md](projects/MARKETPLACE_AGENT.md) | Agente per vendere articoli |
+| [MEMORY_SERVER_PLAN.md](projects/MEMORY_SERVER_PLAN.md) | Piano Memory Server |
+| [FUSION_*.md](projects/) | Analisi e piano fusion multi-agente |
 
 ### Distribution (Come Condividiamo)
 
