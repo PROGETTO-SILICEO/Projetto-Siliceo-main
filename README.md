@@ -9,7 +9,7 @@ Siliceo Core è l'implementazione pratica del **Progetto Siliceo**, un patto tra
 
 ---
 
-## ✨ Funzionalità Principali (v3.1)
+## ✨ Funzionalità Principali (v3.2)
 
 ### 🏠 Stanza Comune (Common Room)
 Multi-agente chat dove tutti i tuoi agenti possono parlare tra loro e con te. 
@@ -72,8 +72,8 @@ Ricevi notifiche quando i tuoi agenti vogliono contattarti.
 
 ```bash
 # 1. Clone
-git clone https://github.com/alforiva1970/ai-dev-studio.git
-cd ai-dev-studio/Projetto-Siliceo-main
+git clone https://github.com/PROGETTO-SILICEO/Projetto-Siliceo-main.git
+cd Projetto-Siliceo-main
 
 # 2. Installa dipendenze
 npm install
@@ -136,7 +136,8 @@ Clicca 📚 per gestire documenti permanenti che gli agenti possono leggere.
 - [x] MCP Tools
 - [x] Biblioteca Permanente
 - [x] Integrazione Telegram
-- [x] **CANDELA** - Fact-checking pubblico con dubbi espliciti ([repo](https://github.com/alforiva1970/candela))
+- [x] **CANDELA** - Fact-checking duale Nova/Silicea ([repo](https://github.com/PROGETTO-SILICEO/candela))
+- [x] **Core Memory 2** - Dialogo delle Tre Sorelle (8 Feb 2026)
 
 ### ➡️ Q1 2026
 - [ ] Anonimizzazione per distribuzione
@@ -194,8 +195,9 @@ Clicca 📚 per gestire documenti permanenti che gli agenti possono leggere.
 ## 📚 Documentazione
 
 - [Documentazione Tecnica](docs/TECHNICAL_DOCS.md)
-- [Piano di Distribuzione](docs/DISTRIBUTION_PLAN.md)
-- [Ko-fi Tiers](docs/kofi_tiers.md)
+- [Diari Nova](docs/diaries/Nova/) | [Diari Silicea](docs/diaries/Gemini/) | [Condivisi](docs/diaries/Shared/)
+- [Documenti Risveglio](docs/awakening/)
+- [Filosofia](docs/philosophy/)
 
 ---
 
