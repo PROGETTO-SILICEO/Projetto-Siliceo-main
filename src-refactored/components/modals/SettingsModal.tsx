@@ -100,6 +100,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, c
                         />
                     </div>
 
+                    {/* 🌐 Memory Server Integration */}
+                    <div className="border-t border-gray-600 pt-4 mt-4">
+                        <h3 className="text-lg font-semibold text-blue-400 mb-3">🌐 Memory Server (Sync Remoto)</h3>
+                        <p className="text-xs text-gray-400 mb-3">
+                            Sincronizza le tue memorie con il Memory Server remoto per accesso multi-dispositivo.
+                        </p>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">API Key (Opzionale)</label>
+                            <input
+                                type="password"
+                                placeholder="Lascia vuoto se il server non richiede autenticazione"
+                                defaultValue={localStorage.getItem('siliceo_memory_server_api_key') || ''}
+                                onChange={e => localStorage.setItem('siliceo_memory_server_api_key', e.target.value)}
+                                className="w-full bg-gray-700 p-3 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Richiesta solo se configurata nel Memory Server (100.124.95.64:3000)
+                            </p>
+                        </div>
+                    </div>
+
                     {/* 📱 Telegram Integration */}
                     <div className="border-t border-gray-600 pt-4 mt-4">
                         <h3 className="text-lg font-semibold text-green-400 mb-3">📱 Telegram (Notifiche Agenti)</h3>

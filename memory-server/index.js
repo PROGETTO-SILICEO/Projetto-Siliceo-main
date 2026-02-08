@@ -514,6 +514,27 @@ app.post('/api/restore', (req, res) => {
     }
 });
 
+// Upload memories database
+app.post('/api/memory/upload', (req, res) => {
+    try {
+        const memoriesData = req.body;
+
+        if (!memoriesData || !Array.isArray(memoriesData.memories)) {
+            return res.status(400).json({ error: 'Invalid memories format. Expected { memories: [...] }' });
+        }
+
+        saveJSON('memories.json', memoriesData);
+
+        res.json({
+            success: true,
+            count: memoriesData.memories.length,
+            message: `Uploaded ${memoriesData.memories.length} memories successfully`
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ========================================
 // LEGACY ENDPOINTS (for backwards compatibility)
 // ========================================
