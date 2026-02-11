@@ -11,6 +11,7 @@
 import MemoryCoreService from './memory';
 import { EmbeddingService } from './vector';
 import { SiblingMessageService } from './siblingMessages';
+import { syncQueue } from './syncQueue';
 import type { Agent, Message, VectorDocument } from '../types';
 
 // === TYPES ===
@@ -40,27 +41,33 @@ const INACTIVITY_THRESHOLD_MS = 15 * 60 * 1000; // 15 minuti
 const DREAM_INTERVAL_MS = 10 * 60 * 1000; // Sogna ogni 10 minuti
 const MEMORY_SERVER_URL = 'http://100.124.95.64:3000';
 
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+    const apiKey = localStorage.getItem('siliceo_memory_server_api_key') || '';
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+    };
+
+    if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    return headers;
+}
+
 // === REMOTE SYNC ===
 
 async function syncDreamToRemote(dream: DreamEntry): Promise<void> {
-    try {
-        const response = await fetch(`${MEMORY_SERVER_URL}/api/dreams/store`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dream })
-        });
-        if (response.ok) {
-            console.log(`[DreamMode] 📡 Dream synced to remote server: ${dream.agentName}`);
-        }
-    } catch (error) {
-        console.warn('[DreamMode] ⚠️ Failed to sync dream to remote:', error);
-        // Don't throw - local save already succeeded
-    }
+    // Usa la coda per retry automatico
+    syncQueue.enqueue('dream', `${MEMORY_SERVER_URL}/api/dreams/store`, { dream });
+    console.log(`[DreamMode] 📡 Dream queued for sync: ${dream.agentName}`);
 }
 
 async function fetchStateFromRemote(): Promise<DreamState | null> {
     try {
-        const response = await fetch(`${MEMORY_SERVER_URL}/api/dreams`);
+        const response = await fetch(`${MEMORY_SERVER_URL}/api/dreams`, {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) return null;
         return await response.json();
     } catch (error) {

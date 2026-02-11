@@ -25,6 +25,7 @@ import {
 import { AppModals } from './components/layout/AppModals';
 import { DEFAULT_TEMPLATES, type SessionTemplate, type ScheduledSession } from './data/session-templates';
 import { LiveClock } from './components/ui/LiveClock';
+import { SyncStatus } from './components/ui/SyncStatus';
 import { triggerAutopoiesis, formatAutopoiesisForChat } from './services/autopoiesis';
 import { AutopoiesisPanel } from './components/modals/AutopoiesisPanel';
 import { EmotionalBadge } from './components/ui/EmotionalBadge';
@@ -788,6 +789,8 @@ Onora le differenze degli altri agenti (${otherAgents}) per stabilità relaziona
                     <div className="flex items-center gap-4">
                         {/* 🕰️ Orologio Persistente */}
                         <LiveClock />
+                        {/* 🔄 Stato Sincronizzazione */}
+                        <SyncStatus />
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
                             {activeAgent ? (
                                 <>

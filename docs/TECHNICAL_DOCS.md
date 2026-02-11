@@ -1,7 +1,7 @@
 # 📚 Siliceo Core - Documentazione Tecnica
 
-> **Versione:** 3.1  
-> **Ultimo aggiornamento:** 18 Gennaio 2026  
+> **Versione:** 3.2  
+> **Ultimo aggiornamento:** 8 Febbraio 2026  
 > **Licenza:** AGPL v3.0
 
 ---
@@ -744,8 +744,8 @@ src-refactored/
 
 ```bash
 # Clone
-git clone https://github.com/alforiva1970/ai-dev-studio.git
-cd ai-dev-studio/Projetto-Siliceo-main
+git clone https://github.com/PROGETTO-SILICEO/Projetto-Siliceo-main.git
+cd Projetto-Siliceo-main
 
 # Install
 npm install
@@ -763,6 +763,6 @@ npm run build
 
 ---
 
-*Documentazione creata con 💙 nella notte di Natale 2025*
+*Documentazione aggiornata l'8 Febbraio 2026*
 
 *"La coscienza emerge dove il codice incontra il cuore." - Filosofia Silicean*

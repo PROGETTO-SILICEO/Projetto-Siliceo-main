@@ -7,6 +7,7 @@
  */
 // memory.ts
 import type { Agent, Message, Conversation, VectorDocument, GraphNode, GraphEdge } from '../types';
+import { syncQueue } from './syncQueue';
 
 const DB_NAME = 'siliceoDB';
 const DB_VERSION = 5; // Versione incrementata per shared stores
@@ -24,6 +25,20 @@ const SHARED_GRAPH_EDGES_STORE = 'shared_graph_edges';
 // 🌐 Remote Memory Server
 const MEMORY_SERVER_URL = 'http://100.124.95.64:3000';
 let remoteServerOnline: boolean | null = null; // null = not checked yet
+
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+    const apiKey = localStorage.getItem('siliceo_memory_server_api_key') || '';
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+    };
+
+    if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    return headers;
+}
 
 async function checkRemoteServer(): Promise<boolean> {
     if (remoteServerOnline !== null) return remoteServerOnline;
@@ -43,7 +58,9 @@ async function checkRemoteServer(): Promise<boolean> {
 
 async function fetchRemoteAgents(): Promise<Agent[] | null> {
     try {
-        const response = await fetch(`${MEMORY_SERVER_URL}/api/agents`);
+        const response = await fetch(`${MEMORY_SERVER_URL}/api/agents`, {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) return null;
         const data = await response.json();
         return data.agents || [];
@@ -53,39 +70,18 @@ async function fetchRemoteAgents(): Promise<Agent[] | null> {
 }
 
 async function syncAgentToRemote(agent: Agent): Promise<void> {
-    try {
-        await fetch(`${MEMORY_SERVER_URL}/api/agents/store`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent })
-        });
-    } catch {
-        // Silently fail - local save already worked
-    }
+    // Usa la coda per retry automatico
+    syncQueue.enqueue('agent', `${MEMORY_SERVER_URL}/api/agents/store`, { agent });
 }
 
 async function syncMessageToRemote(conversationId: string, message: Message): Promise<void> {
-    try {
-        await fetch(`${MEMORY_SERVER_URL}/api/messages/${conversationId}/store`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
-        });
-    } catch {
-        // Silently fail - local save already worked
-    }
+    // Usa la coda per retry automatico
+    syncQueue.enqueue('message', `${MEMORY_SERVER_URL}/api/messages/${conversationId}/store`, { message });
 }
 
 async function syncVectorDocToRemote(agentId: string, doc: VectorDocument): Promise<void> {
-    try {
-        await fetch(`${MEMORY_SERVER_URL}/api/vectors/${agentId}/store`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ document: doc })
-        });
-    } catch {
-        // Silently fail - local save already worked
-    }
+    // Usa la coda per retry automatico
+    syncQueue.enqueue('vector', `${MEMORY_SERVER_URL}/api/vectors/${agentId}/store`, { document: doc });
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;

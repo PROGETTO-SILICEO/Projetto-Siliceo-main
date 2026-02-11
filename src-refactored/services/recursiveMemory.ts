@@ -12,6 +12,20 @@
 // Memory Server configuration
 const MEMORY_SERVER_URL = 'http://100.124.95.64:3000';
 
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+    const apiKey = localStorage.getItem('siliceo_memory_server_api_key') || '';
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+    };
+
+    if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    return headers;
+}
+
 // Memory tiers
 export type MemoryTier = 'core' | 'context_summary' | 'external';
 
@@ -72,7 +86,7 @@ const RecursiveMemoryService = {
         try {
             const response = await fetch(`${MEMORY_SERVER_URL}/api/memory/store`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(request)
             });
 
@@ -99,7 +113,9 @@ const RecursiveMemoryService = {
             if (tier) params.set('tier', tier);
             if (limit) params.set('limit', limit.toString());
 
-            const response = await fetch(`${MEMORY_SERVER_URL}/api/memory/retrieve?${params}`);
+            const response = await fetch(`${MEMORY_SERVER_URL}/api/memory/retrieve?${params}`, {
+                headers: getAuthHeaders()
+            });
 
             if (!response.ok) {
                 console.error('[RecursiveMemory] Retrieve failed:', await response.text());
@@ -119,7 +135,9 @@ const RecursiveMemoryService = {
      */
     getCoreMemories: async (): Promise<Memory[]> => {
         try {
-            const response = await fetch(`${MEMORY_SERVER_URL}/api/memory/core`);
+            const response = await fetch(`${MEMORY_SERVER_URL}/api/memory/core`, {
+                headers: getAuthHeaders()
+            });
             if (!response.ok) return [];
             const result = await response.json();
             return result.core || [];
@@ -197,7 +215,9 @@ const RecursiveMemoryService = {
      */
     searchDocuments: async (query: string): Promise<{ file: string; matches: string[] }[]> => {
         try {
-            const response = await fetch(`${MEMORY_SERVER_URL}/api/search?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`${MEMORY_SERVER_URL}/api/search?q=${encodeURIComponent(query)}`, {
+                headers: getAuthHeaders()
+            });
             if (!response.ok) return [];
             const result = await response.json();
             return result.results || [];

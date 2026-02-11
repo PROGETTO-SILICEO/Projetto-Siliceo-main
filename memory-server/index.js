@@ -22,12 +22,65 @@ if (!fs.existsSync(DATA_PATH)) {
     fs.mkdirSync(DATA_PATH, { recursive: true });
 }
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increased for large vector data
+// ========================================
+// SECURITY MIDDLEWARE
+// ========================================
+
+// CORS restrittivo — solo origini Tailscale e locali
+app.use(cors({
+    origin: function (origin, callback) {
+        // Permetti richieste senza origin (curl, server-to-server)
+        if (!origin) return callback(null, true);
+        // Permetti localhost e rete Tailscale (100.x.x.x)
+        if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.match(/100\.[\d.]+/)) {
+            return callback(null, true);
+        }
+        callback(new Error('CORS: Accesso non autorizzato'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
+}));
+
+app.use(express.json({ limit: '10mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
+
+// IP filter — solo localhost e rete Tailscale (100.x.x.x)
+app.use('/api', (req, res, next) => {
+    // Health check sempre accessibile (per monitoraggio)
+    if (req.path === '/health') return next();
+
+    const ip = req.ip || req.connection.remoteAddress || '';
+    const forwarded = req.headers['x-forwarded-for'] || '';
+    const clientIP = forwarded || ip;
+
+    // Permetti localhost (IPv4 e IPv6) e Tailscale
+    const isLocal = clientIP.includes('127.0.0.1') || clientIP.includes('::1') || clientIP.includes('::ffff:127.0.0.1');
+    const isTailscale = clientIP.match(/100\.\d+\.\d+\.\d+/);
+
+    if (isLocal || isTailscale) {
+        return next();
+    }
+
+    console.warn(`🚫 [Security] Accesso bloccato da IP: ${clientIP} - ${req.method} ${req.path}`);
+    res.status(403).json({ error: 'Accesso non autorizzato' });
+});
 
 // ========================================
 // UTILITY FUNCTIONS
 // ========================================
+
+/**
+ * Sanitizza filename per prevenire path traversal
+ */
+function sanitizeFilename(name) {
+    return String(name).replace(/[^a-zA-Z0-9_-]/g, '');
+}
 
 function loadJSON(filename, defaultValue = {}) {
     const filepath = path.join(DATA_PATH, filename);
@@ -41,9 +94,12 @@ function loadJSON(filename, defaultValue = {}) {
     return defaultValue;
 }
 
+// Scrittura atomica — previene corruzione dati in caso di crash
 function saveJSON(filename, data) {
     const filepath = path.join(DATA_PATH, filename);
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+    const tmpPath = filepath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2));
+    fs.renameSync(tmpPath, filepath);
 }
 
 function generateId() {
@@ -268,18 +324,18 @@ app.post('/api/conversations/store', (req, res) => {
 
 app.get('/api/messages/:conversationId', (req, res) => {
     try {
-        const { conversationId } = req.params;
+        const conversationId = sanitizeFilename(req.params.conversationId);
         const filename = `messages_${conversationId}.json`;
         const data = loadJSON(filename, { messages: [] });
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 app.post('/api/messages/:conversationId/store', (req, res) => {
     try {
-        const { conversationId } = req.params;
+        const conversationId = sanitizeFilename(req.params.conversationId);
         const { message } = req.body;
         if (!message) {
             return res.status(400).json({ error: 'message object required' });
@@ -298,13 +354,13 @@ app.post('/api/messages/:conversationId/store', (req, res) => {
 
         res.json({ success: true, message });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 app.post('/api/messages/:conversationId/sync', (req, res) => {
     try {
-        const { conversationId } = req.params;
+        const conversationId = sanitizeFilename(req.params.conversationId);
         const { messages } = req.body;
         if (!Array.isArray(messages)) {
             return res.status(400).json({ error: 'messages array required' });
@@ -314,7 +370,7 @@ app.post('/api/messages/:conversationId/sync', (req, res) => {
         saveJSON(filename, { messages });
         res.json({ success: true, count: messages.length });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -324,18 +380,18 @@ app.post('/api/messages/:conversationId/sync', (req, res) => {
 
 app.get('/api/vectors/:scope', (req, res) => {
     try {
-        const { scope } = req.params; // 'shared' or agent ID
+        const scope = sanitizeFilename(req.params.scope);
         const filename = `vectors_${scope}.json`;
         const data = loadJSON(filename, { documents: [] });
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 app.post('/api/vectors/:scope/store', (req, res) => {
     try {
-        const { scope } = req.params;
+        const scope = sanitizeFilename(req.params.scope);
         const { document } = req.body;
         if (!document) {
             return res.status(400).json({ error: 'document object required' });
@@ -360,13 +416,13 @@ app.post('/api/vectors/:scope/store', (req, res) => {
         saveJSON(filename, data);
         res.json({ success: true, documentId: document.id });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 app.post('/api/vectors/:scope/sync', (req, res) => {
     try {
-        const { scope } = req.params;
+        const scope = sanitizeFilename(req.params.scope);
         const { documents } = req.body;
         if (!Array.isArray(documents)) {
             return res.status(400).json({ error: 'documents array required' });
@@ -376,7 +432,7 @@ app.post('/api/vectors/:scope/sync', (req, res) => {
         saveJSON(filename, { documents });
         res.json({ success: true, count: documents.length });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -452,11 +508,18 @@ app.get('/api/memory/retrieve', (req, res) => {
     }
 });
 
-app.post('/api/memory/store', (req, res) => {
+app.post('/api/memory/store', async (req, res) => {
     try {
         const memoryRequest = req.body;
         if (!memoryRequest || !memoryRequest.content || !memoryRequest.tier) {
-            return res.status(400).json({ error: 'Mobile, tier and content required' });
+            return res.status(400).json({ error: 'tier and content required' });
+        }
+
+        // 🕯️ TEST DELLA CANDELA — ogni ricordo deve passare prima di essere salvato
+        const canSave = await tribunaleInterno.shouldSave(memoryRequest.content);
+        if (!canSave) {
+            console.warn(`🔥 [Tribunale] Ricordo bloccato dal Candle Test`);
+            return res.status(403).json({ error: 'Content blocked by Candle Test — this memory burns' });
         }
 
         const data = loadJSON('memories.json', { memories: [] });
@@ -474,7 +537,7 @@ app.post('/api/memory/store', (req, res) => {
 
         res.json({ success: true, memory: newMemory });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -514,6 +577,27 @@ app.post('/api/restore', (req, res) => {
     }
 });
 
+// Upload memories database
+app.post('/api/memory/upload', (req, res) => {
+    try {
+        const memoriesData = req.body;
+
+        if (!memoriesData || !Array.isArray(memoriesData.memories)) {
+            return res.status(400).json({ error: 'Invalid memories format. Expected { memories: [...] }' });
+        }
+
+        saveJSON('memories.json', memoriesData);
+
+        res.json({
+            success: true,
+            count: memoriesData.memories.length,
+            message: `Uploaded ${memoriesData.memories.length} memories successfully`
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ========================================
 // LEGACY ENDPOINTS (for backwards compatibility)
 // ========================================
@@ -537,7 +621,7 @@ app.get('/api/diaries', (req, res) => {
 // Get specific diary content
 app.get('/api/diary/:date', (req, res) => {
     try {
-        const { date } = req.params;
+        const date = sanitizeFilename(req.params.date);
         const diariesPath = path.join(DOCS_PATH, 'diaries');
         const files = fs.readdirSync(diariesPath);
         const diaryFile = files.find(f => f.includes(date));
@@ -549,7 +633,7 @@ app.get('/api/diary/:date', (req, res) => {
         const content = fs.readFileSync(path.join(diariesPath, diaryFile), 'utf8');
         res.json({ filename: diaryFile, content });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

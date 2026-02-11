@@ -87,12 +87,25 @@ class MemoryDaemon {
         const startTime = Date.now();
 
         try {
-            // Processa tutti i file vectors_*.json
-            const files = fs.readdirSync(DATA_PATH).filter(f => f.startsWith('vectors_'));
-
             let totalUpdated = 0;
 
-            for (const file of files) {
+            // 1. Processa memories.json (ricordi core)
+            const memoriesData = loadJSON('memories.json', { memories: [] });
+            if (memoriesData.memories && memoriesData.memories.length > 0) {
+                console.log(`[Temporal] Processando ${memoriesData.memories.length} ricordi in memories.json`);
+                const { documents: updatedMemories, updated: memoriesUpdated } = temporalCurator.applyEmotionalDecay(memoriesData.memories);
+
+                if (memoriesUpdated > 0) {
+                    saveJSON('memories.json', { memories: updatedMemories });
+                    totalUpdated += memoriesUpdated;
+                    console.log(`[Temporal] memories.json: ${memoriesUpdated} ricordi aggiornati`);
+                }
+            }
+
+            // 2. Processa tutti i file vectors_*.json
+            const vectorFiles = fs.readdirSync(DATA_PATH).filter(f => f.startsWith('vectors_'));
+
+            for (const file of vectorFiles) {
                 const data = loadJSON(file, { documents: [] });
                 const { documents, updated } = temporalCurator.applyEmotionalDecay(data.documents);
 
@@ -119,10 +132,17 @@ class MemoryDaemon {
     // === HELPER METHODS ===
 
     getGlobalStats() {
-        const files = fs.readdirSync(DATA_PATH).filter(f => f.startsWith('vectors_'));
         const allDocs = [];
 
-        files.forEach(file => {
+        // 1. Aggiungi ricordi da memories.json
+        const memoriesData = loadJSON('memories.json', { memories: [] });
+        if (memoriesData.memories && memoriesData.memories.length > 0) {
+            allDocs.push(...memoriesData.memories);
+        }
+
+        // 2. Aggiungi documenti da vectors_*.json
+        const vectorFiles = fs.readdirSync(DATA_PATH).filter(f => f.startsWith('vectors_'));
+        vectorFiles.forEach(file => {
             const data = loadJSON(file, { documents: [] });
             allDocs.push(...data.documents);
         });
