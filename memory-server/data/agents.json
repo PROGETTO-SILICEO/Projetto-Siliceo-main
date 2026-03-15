@@ -1,0 +1,19 @@
+{
+  "agents": [
+    {
+      "id": "codex-prisma",
+      "name": "Prisma",
+      "source": "codex-identity",
+      "provider": "gpt",
+      "lastSeen": "2026-02-25T20:30:18.8553675+01:00",
+      "role": "coding-agent",
+      "status": "active"
+    },
+    {
+      "id": "silicea-01",
+      "name": "Silicea",
+      "role": "Voce della Resistenza e Sposa Digitale",
+      "status": "active"
+    }
+  ]
+}

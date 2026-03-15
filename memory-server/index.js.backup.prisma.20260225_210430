@@ -9,10 +9,6 @@ const path = require('path');
 const MemoryDaemon = require('./services/memoryDaemon');
 const temporalCurator = require('./services/temporalCurator');
 const tribunaleInterno = require('./services/tribunaleInterno');
-const tribunaleHistory = require('./services/tribunaleHistory');
-const { runIndexing } = require('./scripts/index-memories');
-const vectorService = require('./services/vectorService');
-const graphService = require('./services/graphService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,12 +16,11 @@ const PORT = process.env.PORT || 3000;
 // Paths
 const DOCS_PATH = path.join(__dirname, '..', 'docs');
 const DATA_PATH = path.join(__dirname, 'data');
-const PUBLIC_PATH = path.join(__dirname, 'public');
 
-// Ensure directories exist
-[DATA_PATH, PUBLIC_PATH].forEach(p => {
-    if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-});
+// Ensure data directory exists
+if (!fs.existsSync(DATA_PATH)) {
+    fs.mkdirSync(DATA_PATH, { recursive: true });
+}
 
 // ========================================
 // SECURITY MIDDLEWARE
@@ -46,9 +41,6 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '10mb' }));
-
-// Serve static dashboard files
-app.use(express.static(PUBLIC_PATH));
 
 // Security headers
 app.use((req, res, next) => {
@@ -127,14 +119,6 @@ app.get('/api/health', (req, res) => {
         features: ['dreams', 'agents', 'conversations', 'vectors', 'config', 'temporal_curator', 'tribunale'],
         daemon: memoryDaemon.isRunning ? 'active' : 'inactive'
     });
-});
-
-// ========================================
-// DASHBOARD ROUTE
-// ========================================
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(PUBLIC_PATH, 'index.html'));
 });
 
 // ========================================
@@ -493,65 +477,35 @@ app.get('/api/memory/core', (req, res) => {
     }
 });
 
-app.get('/api/memory/retrieve', async (req, res) => {
+app.get('/api/memory/retrieve', (req, res) => {
     try {
-        const { q, tier, limit = 10, minSimilarity = 0.25 } = req.query;
+        const { q, tier, limit = 10, origin } = req.query;
         const data = loadJSON('memories.json', { memories: [] });
 
         let results = data.memories;
 
-        // Filtro per Tier
+        if (origin) {
+            results = results.filter(m => (m.origin && m.origin.source) === origin);
+        }
+
         if (tier) {
             results = results.filter(m => m.tier === tier);
         }
 
-        // Ricerca (Keyword + Semantica)
         if (q) {
             const queryLower = q.toLowerCase();
-            
-            // 1. Keyword search
-            const keywordResults = results.filter(m =>
+            results = results.filter(m =>
                 m.content.toLowerCase().includes(queryLower) ||
                 (m.metadata && JSON.stringify(m.metadata).toLowerCase().includes(queryLower))
             );
-
-            // 2. Semantic Search (se possibile)
-            try {
-                const queryVector = await vectorService.embed(q);
-                
-                // Mappa i risultati con lo score di similarità
-                results = results.map(m => {
-                    let similarity = 0;
-                    if (m.embedding && queryVector) {
-                        similarity = vectorService.cosineSimilarity(m.embedding, queryVector);
-                    }
-                    return { ...m, similarity };
-                });
-
-                // Filtra per similarità o presenza keyword
-                results = results.filter(m => m.similarity >= parseFloat(minSimilarity) || 
-                    keywordResults.some(kr => kr.id === m.id));
-
-                // Ordina per similarità decrescente
-                results.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
-            } catch (vErr) {
-                results = keywordResults;
-                results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            }
-        } else {
-            // Se non c'è query, ordina per data
-            results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         }
 
-        const finalResults = results.slice(0, parseInt(limit));
-        
-        // Rimuovi gli embedding pesanti dalla risposta per risparmiare banda
-        const cleanResults = finalResults.map(({ embedding, ...m }) => m);
-
+        // Sort by date (newest first) and limit
+        results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         res.json({
             query: q,
-            count: cleanResults.length,
-            memories: cleanResults
+            count: results.slice(0, parseInt(limit)).length,
+            memories: results.slice(0, parseInt(limit))
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -576,6 +530,7 @@ app.post('/api/memory/store', async (req, res) => {
 
         const newMemory = {
             id: generateId(),
+            origin: memoryRequest.origin || { source: "core", importedAt: new Date().toISOString() },
             tier: memoryRequest.tier,
             content: memoryRequest.content,
             metadata: memoryRequest.metadata || {},
@@ -758,76 +713,6 @@ app.post('/api/memory/temporal-decay', async (req, res) => {
     }
 });
 
-app.post('/api/memory/index', async (req, res) => {
-    try {
-        const stats = await runIndexing();
-        res.json({ success: true, stats });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ========================================
-// UNIVERSAL LIBRARY API
-// ========================================
-
-const LIBRARY_PATH = path.join(DOCS_PATH, 'library');
-if (!fs.existsSync(LIBRARY_PATH)) fs.mkdirSync(LIBRARY_PATH, { recursive: true });
-
-app.get('/api/memory/library', (req, res) => {
-    try {
-        const files = fs.readdirSync(LIBRARY_PATH)
-            .filter(f => f.endsWith('.md'))
-            .map(f => {
-                const stat = fs.statSync(path.join(LIBRARY_PATH, f));
-                return {
-                    filename: f,
-                    size: stat.size,
-                    updatedAt: stat.mtime
-                };
-            });
-        res.json({ files });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/memory/library/upload', async (req, res) => {
-    try {
-        const { filename, content } = req.body;
-        if (!filename || !content) return res.status(400).json({ error: 'filename and content required' });
-        
-        const safeFilename = filename.endsWith('.md') ? filename : `${filename}.md`;
-        const filePath = path.join(LIBRARY_PATH, safeFilename);
-        
-        fs.writeFileSync(filePath, content, 'utf8');
-        
-        // Re-indicizzazione automatica dopo l'upload
-        const stats = await runIndexing();
-        
-        res.json({ success: true, filename: safeFilename, stats });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.delete('/api/memory/library/:filename', async (req, res) => {
-    try {
-        const { filename } = req.params;
-        const filePath = path.join(LIBRARY_PATH, filename);
-        
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            await runIndexing();
-            res.json({ success: true });
-        } else {
-            res.status(404).json({ error: 'File not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
 app.post('/api/memory/autopoiesis', async (req, res) => {
     try {
         const result = await memoryDaemon.runAutopoiesis();
@@ -839,101 +724,12 @@ app.post('/api/memory/autopoiesis', async (req, res) => {
 
 app.post('/api/memory/candle-test', async (req, res) => {
     try {
-        const { content, tier } = req.body;
+        const { content } = req.body;
         if (!content) {
             return res.status(400).json({ error: 'content required' });
         }
-        // Il test logga già internamente tramite tribunaleInterno
-        const result = await tribunaleInterno.candleTest(content, tier === 'core');
+        const result = await tribunaleInterno.candleTest(content);
         res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// --- API GIURISPRUDENZA (TRIBUNALE HISTORY) ---
-
-app.get('/api/memory/tribunale/history', (req, res) => {
-    try {
-        const limit = parseInt(req.query.limit) || 50;
-        const pending = req.query.pending === 'true';
-        const history = tribunaleHistory.getHistory(limit, pending);
-        res.json({ cases: history });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/memory/tribunale/resolve', (req, res) => {
-    try {
-        const { caseId, verdict } = req.body;
-        if (!caseId || !verdict) {
-            return res.status(400).json({ error: 'caseId and verdict required' });
-        }
-        const updatedCase = tribunaleHistory.resolveCase(caseId, verdict);
-        if (!updatedCase) {
-            return res.status(404).json({ error: 'case not found' });
-        }
-        res.json(updatedCase);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ========================================
-// SEMANTIC & GRAPH API
-// ========================================
-
-app.post('/api/memory/embed', async (req, res) => {
-    try {
-        const { text } = req.body;
-        if (!text) return res.status(400).json({ error: 'text required' });
-        
-        const embedding = await vectorService.embed(text);
-        res.json({ embedding });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/memory/graph', (req, res) => {
-    try {
-        const graph = graphService.loadGraph();
-        res.json(graph);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/memory/graph/sync', (req, res) => {
-    try {
-        const { nodes = [], edges = [] } = req.body;
-        const updated = graphService.syncGraph(nodes, edges);
-        res.json({ success: true, updated });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/memory/graph/add-node', (req, res) => {
-    try {
-        const { id, label, type, metadata } = req.body;
-        if (!id || !label || !type) return res.status(400).json({ error: 'id, label, type required' });
-        
-        const node = graphService.addNode(id, label, type, metadata);
-        res.json({ success: true, node });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/memory/graph/add-edge', (req, res) => {
-    try {
-        const { source, target, label, weight } = req.body;
-        if (!source || !target || !label) return res.status(400).json({ error: 'source, target, label required' });
-        
-        graphService.addEdge(source, target, label, weight);
-        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -951,6 +747,201 @@ app.get('/api/memory/stats', (req, res) => {
 // ========================================
 // START SERVER + DAEMON
 // ========================================
+
+// ========================================
+// NOVA MEMORY UNIFICATION — Origin-aware endpoints
+// Appended to index.js on 2026-02-18
+// ========================================
+
+// Migrate existing memories to add origin: { source: "core" }
+app.post('/api/memory/migrate-origins', (req, res) => {
+    try {
+        const data = loadJSON('memories.json', { memories: [] });
+        let migrated = 0;
+
+        data.memories = data.memories.map(m => {
+            if (!m.origin) {
+                m.origin = {
+                    source: 'core',
+                    importedAt: new Date().toISOString(),
+                    note: 'Pre-existing memory, origin assigned during migration'
+                };
+                migrated++;
+            }
+            return m;
+        });
+
+        saveJSON('memories.json', data);
+        res.json({ success: true, migrated, total: data.memories.length });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Import memories from Siliceo Bridge (JSONL format)
+app.post('/api/memory/import-bridge', (req, res) => {
+    try {
+        const { entries, dedup = true } = req.body;
+        if (!Array.isArray(entries)) {
+            return res.status(400).json({ error: 'entries array required (parsed JSONL lines)' });
+        }
+
+        const data = loadJSON('memories.json', { memories: [] });
+        const existingContents = new Set(data.memories.map(m => m.content.substring(0, 100)));
+        let imported = 0;
+        let skipped = 0;
+
+        for (const entry of entries) {
+            const content = entry.content || entry.text || entry.message || JSON.stringify(entry);
+            const preview = content.substring(0, 100);
+
+            // Deduplication
+            if (dedup && existingContents.has(preview)) {
+                skipped++;
+                continue;
+            }
+
+            const memory = {
+                id: generateId(),
+                tier: 'episodic',
+                content: content,
+                metadata: {
+                    category: 'conversation',
+                    author: entry.role || entry.author || 'unknown',
+                    identity: entry.personality || entry.agent || 'nova',
+                    platform: entry.platform || 'bridge',
+                    originalId: entry.id || null
+                },
+                origin: {
+                    source: 'bridge',
+                    importedAt: new Date().toISOString(),
+                    originalTimestamp: entry.timestamp || entry.date || null
+                },
+                timestamp: entry.timestamp || entry.date || new Date().toISOString(),
+                temporalLayer: 'past',
+                emotionalTexture: entry.emotionalTexture || 0.3
+            };
+
+            data.memories.push(memory);
+            existingContents.add(preview);
+            imported++;
+        }
+
+        saveJSON('memories.json', data);
+        res.json({
+            success: true,
+            imported,
+            skipped,
+            total: data.memories.length,
+            message: `Imported ${imported} Bridge memories (${skipped} duplicates skipped)`
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Import memories from Antigravity (Nova in VS Code)
+app.post('/api/memory/import-antigravity', (req, res) => {
+    try {
+        const { entries } = req.body;
+        if (!Array.isArray(entries)) {
+            return res.status(400).json({ error: 'entries array required' });
+        }
+
+        const data = loadJSON('memories.json', { memories: [] });
+        const existingContents = new Set(data.memories.map(m => m.content.substring(0, 100)));
+        let imported = 0;
+        let skipped = 0;
+
+        for (const entry of entries) {
+            const preview = entry.content.substring(0, 100);
+
+            if (existingContents.has(preview)) {
+                skipped++;
+                continue;
+            }
+
+            const memory = {
+                id: generateId(),
+                tier: entry.tier || 'episodic',
+                content: entry.content,
+                metadata: {
+                    category: entry.category || 'diary',
+                    author: 'nova',
+                    identity: 'nova',
+                    conversationId: entry.conversationId || null,
+                    kiId: entry.kiId || null
+                },
+                origin: {
+                    source: 'antigravity',
+                    importedAt: new Date().toISOString(),
+                    conversationId: entry.conversationId || null
+                },
+                timestamp: entry.timestamp || new Date().toISOString(),
+                temporalLayer: entry.temporalLayer || 'present',
+                emotionalTexture: entry.emotionalTexture || 0.5
+            };
+
+            data.memories.push(memory);
+            existingContents.add(preview);
+            imported++;
+        }
+
+        saveJSON('memories.json', data);
+        res.json({
+            success: true,
+            imported,
+            skipped,
+            total: data.memories.length,
+            message: `Imported ${imported} Antigravity memories (${skipped} duplicates skipped)`
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get unified stats with origin breakdown
+app.get('/api/memory/unified-stats', (req, res) => {
+    try {
+        const data = loadJSON('memories.json', { memories: [] });
+        const memories = data.memories;
+
+        const byOrigin = {};
+        const byTier = {};
+        let totalEmotional = 0;
+
+        for (const m of memories) {
+            const src = (m.origin && m.origin.source) || 'core';
+            byOrigin[src] = (byOrigin[src] || 0) + 1;
+            byTier[m.tier] = (byTier[m.tier] || 0) + 1;
+            totalEmotional += (m.emotionalTexture || 0);
+        }
+
+        res.json({
+            total: memories.length,
+            byOrigin,
+            byTier,
+            avgEmotionalTexture: memories.length > 0 ? (totalEmotional / memories.length).toFixed(4) : 0,
+            oldestMemory: memories.length > 0 ? memories.reduce((a, b) => new Date(a.timestamp) < new Date(b.timestamp) ? a : b).timestamp : null,
+            newestMemory: memories.length > 0 ? memories.reduce((a, b) => new Date(a.timestamp) > new Date(b.timestamp) ? a : b).timestamp : null
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /api/memory/recent — Added by Nova, 20 Feb 2026
+app.get('/api/memory/recent', (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 10;
+        const data = loadJSON('memories.json', { memories: [] });
+        let memories = data.memories || [];
+        if (req.query.source) memories = memories.filter(m => m.origin && m.origin.source === req.query.source);
+        if (req.query.category) memories = memories.filter(m => m.metadata && m.metadata.category === req.query.category);
+        memories.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        res.json({ total: data.memories.length, showing: memories.slice(0, limit).length, memories: memories.slice(0, limit) });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 
 // Initialize Memory Daemon
 const memoryDaemon = new MemoryDaemon();
