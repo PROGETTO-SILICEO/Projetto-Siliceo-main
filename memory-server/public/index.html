@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siliceo Memory Server | Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="candle">🕯️</span>
+                <h1>Siliceo</h1>
+                <p class="subtitle">Memory Server v3.0</p>
+            </div>
+            <nav>
+                <button class="nav-btn active" data-tab="overview">
+                    <span class="icon">📊</span> Panoramica
+                </button>
+                <button class="nav-btn" data-tab="memory">
+                    <span class="icon">🧠</span> Memoria
+                </button>
+                <button class="nav-btn" data-tab="config">
+                    <span class="icon">⚙️</span> Impostazioni
+                </button>
+                <button class="nav-btn" data-tab="graph">
+                    <span class="icon">🕸️</span> Grafo Semantico
+                </button>
+                <button class="nav-btn" data-tab="library">
+                    <span class="icon">📚</span> Libreria
+                </button>
+                <button class="nav-btn" data-tab="jurisprudence">
+                    <span class="icon">⚖️</span> Giurisprudenza
+                </button>
+                <button class="nav-btn" data-tab="logs">
+                    <span class="icon">📜</span> Log
+                </button>
+            </nav>
+            <div class="status-footer">
+                <div class="status-item">
+                    <span class="status-dot green"></span>
+                    <span>Server Online</span>
+                </div>
+                <div class="status-item">
+                    <span id="daemon-status" class="status-dot orange"></span>
+                    <span>Daemon: <span id="daemon-label">Caricamento...</span></span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <header>
+                <div class="header-info">
+                    <h2 id="tab-title">Stato del Sistema</h2>
+                    <p id="tab-description">Monitoraggio real-time del cervello digitale.</p>
+                </div>
+                <button id="refresh-btn" class="secondary-btn">🔄 Aggiorna</button>
+            </header>
+
+            <!-- TAB: OVERVIEW -->
+            <section id="tab-overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Memorie Totali</h3>
+                        <p class="stat-value" id="total-memories">--</p>
+                        <span class="stat-trend">Registrate nei vault</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Uptime</h3>
+                        <p class="stat-value" id="uptime">--</p>
+                        <span class="stat-trend">Dal riavvio</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>IP Tailscale</h3>
+                        <p class="stat-value" id="server-ip">100.x.x.x</p>
+                        <span class="stat-trend">Rete sicura</span>
+                    </div>
+                </div>
+
+                <div class="dashboard-sections">
+                    <div class="section-card">
+                        <h3>⚡ Azioni Rapide</h3>
+                        <div class="action-buttons">
+                            <button id="run-curation" class="action-btn">
+                                <span class="icon">🕰️</span> Esegui Temporal Curation
+                            </button>
+                            <button id="run-indexing" class="action-btn">
+                                <span class="icon">📖</span> Indicizza Documenti
+                            </button>
+                        </div>
+                    </div>
+                    <div class="section-card">
+                        <h3>⚖️ Tribunale Interno</h3>
+                        <p class="info-text">Il Candle Test è attualmente attivo tramite Ollama.</p>
+                        <div class="status-bar">
+                            <label>Modello: <code id="candle-model">--</code></label>
+                            <span class="badge" id="ollama-status">Verifica...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: MEMORY -->
+            <section id="tab-memory" class="tab-content">
+                <div class="memory-grid">
+                    <div class="section-card">
+                        <h3>📊 Distribuzione Memoria</h3>
+                        <div id="memory-stats-container" class="stat-list">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: CONFIG -->
+            <section id="tab-config" class="tab-content">
+                <div class="section-card full">
+                    <h3>⚙️ Parametri di Configurazione</h3>
+                    <form id="config-form">
+                        <div id="config-fields">
+                            <!-- Injected by JS -->
+                        </div>
+                        <button type="submit" class="primary-btn">Salva Modifiche</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- TAB GRAFO SEMANTICO -->
+            <div id="tab-graph" class="tab-content">
+                <div class="section-card full">
+                    <h3>🕸️ Il Telaio Semantico (Grafo)</h3>
+                    <p class="info-text">Rappresentazione collettiva delle connessioni tra entità e concetti.</p>
+                    <div id="graph-container" style="width: 100%; height: 500px; background: rgba(0,0,0,0.2); border-radius: 12px; position: relative; overflow: hidden;">
+                        <canvas id="graph-canvas"></canvas>
+                        <div id="graph-overlay" style="position: absolute; top: 10px; right: 10px; display: flex; gap: 10px;">
+                            <button class="secondary-btn" onclick="app.refreshGraph()">🔄 Aggiorna</button>
+                        </div>
+                    </div>
+                    <div id="node-info" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; min-height: 50px;">
+                        <p class="info-text" style="font-style: italic;">Clicca su un nodo per vedere i dettagli.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: LIBRARY -->
+            <section id="tab-library" class="tab-content">
+                <div class="dashboard-sections">
+                    <div class="section-card">
+                        <h3>📤 Carica Documento</h3>
+                        <p class="info-text">Aggiungi nuovi documenti (.md) alla conoscenza condivisa.</p>
+                        <form id="library-upload-form">
+                            <div class="form-group">
+                                <label>Nome File</label>
+                                <input type="text" id="lib-filename" placeholder="es: trattato_di_etica.md" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Contenuto (Markdown)</label>
+                                <textarea id="lib-content" style="width:100%; height:200px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:10px; color:white; padding:1rem; outline:none; font-family:'JetBrains Mono', monospace;" placeholder="# Titolo..."></textarea>
+                            </div>
+                            <button type="submit" class="primary-btn">🚀 Pubblica in Libreria</button>
+                        </form>
+                    </div>
+                    <div class="section-card">
+                        <h3>📚 Documenti Condivisi</h3>
+                        <p class="info-text">Elenco dei file attualmente presenti nella libreria.</p>
+                        <div id="library-list" class="stat-list">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: JURISPRUDENCE -->
+            <section id="tab-jurisprudence" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Casi Totali</h3>
+                        <p class="stat-value" id="jury-total">0</p>
+                        <span class="stat-trend">Archivio storico</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Da Revisionare</h3>
+                        <p class="stat-value" id="jury-pending" style="color: var(--orange);">0</p>
+                        <span class="stat-trend">Revisione richiesta</span>
+                    </div>
+                </div>
+
+                <div class="section-card full">
+                    <h3>📜 Giurisprudenza Digitale (Precedenti Etici)</h3>
+                    <p class="info-text">Registro asincrono dei verdetti. Puoi risolvere i casi ambigui con il tuo verdetto umano.</p>
+                    <div id="jurisprudence-list" class="stat-list">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: LOGS -->
+            <section id="tab-logs" class="tab-content">
+                <div class="log-container" id="log-output">
+                  <div class="log-entry system">In attesa di nuovi log...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast" class="toast hidden">Messaggio</div>
+
+    <script src="app.js"></script>
+</body>
+</html>

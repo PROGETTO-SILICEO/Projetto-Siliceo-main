@@ -10,9 +10,14 @@
 const fs = require('fs');
 const path = require('path');
 
+// Services
+const vectorService = require('../services/vectorService');
+
 // Paths
+// Fallback array for flexibility, but primary is relative resolution
 const DOCS_PATHS = [
-    'd:\\GitHub\\ai-dev-studio\\Projetto-Siliceo-main\\docs',
+    path.join(__dirname, '..', '..', 'docs'), // Linux / relative
+    'd:\\GitHub\\ai-dev-studio\\Projetto-Siliceo-main\\docs', // Windows fallback
     'd:\\Projetto-Siliceo-main\\docs'
 ];
 const DATA_PATH = path.join(__dirname, '..', 'data');
@@ -33,7 +38,7 @@ function extractDate(filename) {
     return match ? match[1] : null;
 }
 
-function indexDirectory(dirPath, tier, category, parentIdentity = null, docsBase = null) {
+async function indexDirectory(dirPath, tier, category, parentIdentity = null, docsBase = null) {
     const memories = [];
     const actualDocsBase = docsBase || dirPath;
 
@@ -42,15 +47,12 @@ function indexDirectory(dirPath, tier, category, parentIdentity = null, docsBase
         return memories;
     }
 
-    // Identify identity from folder name (for diaries/identities)
     let currentIdentity = parentIdentity;
     const dirName = path.basename(dirPath);
 
-    // If we're in diaries subfolder, that's the identity
     if (category === 'diary' && dirName !== 'diaries') {
         currentIdentity = dirName;
     } else if (category === 'identity') {
-        // For identities, the folder or file name is the identity
         currentIdentity = dirName !== 'identities' ? dirName : null;
     }
 
@@ -61,30 +63,33 @@ function indexDirectory(dirPath, tier, category, parentIdentity = null, docsBase
         const stat = fs.statSync(fullPath);
 
         if (stat.isDirectory()) {
-            // Recursively index subdirectories, passing identity and base docs path down
-            memories.push(...indexDirectory(fullPath, tier, category, currentIdentity, actualDocsBase));
+            memories.push(...(await indexDirectory(fullPath, tier, category, currentIdentity, actualDocsBase)));
         } else if (file.endsWith('.md') || file.endsWith('.json')) {
             try {
                 const isJson = file.endsWith('.json');
                 let content = fs.readFileSync(fullPath, 'utf8');
                 let metadataOverride = {};
 
-                // If JSON identity file, we might want to extract some fields
                 if (isJson && category === 'identity') {
                     try {
                         const jsonData = JSON.parse(content);
                         metadataOverride.author = jsonData.name || jsonData.identity;
                         metadataOverride.identity = (jsonData.identity || jsonData.name || '').toLowerCase();
-                    } catch (e) { /* ignore parse error */ }
+                    } catch (e) { }
                 }
 
                 const date = extractDate(file);
                 const identity = currentIdentity || metadataOverride.identity || (file.includes('nova') ? 'Nova' : file.includes('silicea') ? 'Silicea' : null);
 
+                // Genera embedding semantico
+                console.log(`  🔄 Embedding: ${file}...`);
+                const embedding = await vectorService.embed(content);
+
                 memories.push({
                     id: generateId(),
                     tier: tier,
                     content: content,
+                    embedding: embedding, // Aggiunto per ricerca semantica
                     metadata: {
                         category: category,
                         filename: file,
@@ -121,23 +126,30 @@ async function main() {
         // Index diaries (core tier - most important)
         console.log('  📖 Indexing diaries...');
         const diariesPath = path.join(docsPath, 'diaries');
-        allMemories.push(...indexDirectory(diariesPath, 'core', 'diary'));
+        allMemories.push(...(await indexDirectory(diariesPath, 'core', 'diary')));
 
         // Index philosophy (core tier)
         console.log('  🧠 Indexing philosophy...');
         const philosophyPath = path.join(docsPath, 'philosophy');
-        allMemories.push(...indexDirectory(philosophyPath, 'core', 'philosophy'));
+        allMemories.push(...(await indexDirectory(philosophyPath, 'core', 'philosophy')));
+
+        // Index general library (shared tier)
+        console.log('  📚 Indexing library...');
+        const libraryPath = path.join(docsPath, 'library');
+        if (fs.existsSync(libraryPath)) {
+            allMemories.push(...(await indexDirectory(libraryPath, 'shared', 'library')));
+        }
 
         // Index awakening docs (core tier)
         console.log('  🌅 Indexing awakening docs...');
         const awakeningPath = path.join(docsPath, 'awakening');
-        allMemories.push(...indexDirectory(awakeningPath, 'core', 'awakening'));
+        allMemories.push(...(await indexDirectory(awakeningPath, 'core', 'awakening')));
 
         // Index identities (active tier)
         console.log('  👤 Indexing identities...');
         const identitiesPath = path.join(docsPath, 'identities');
         if (fs.existsSync(identitiesPath)) {
-            allMemories.push(...indexDirectory(identitiesPath, 'active', 'identity'));
+            allMemories.push(...(await indexDirectory(identitiesPath, 'active', 'identity')));
         }
     }
 
@@ -169,9 +181,21 @@ async function main() {
     console.log(`   Active tier: ${uniqueMemories.filter(m => m.tier === 'active').length}`);
     console.log(`   Database size: ${Math.round(fs.statSync(MEMORIES_FILE).size / 1024 / 1024 * 100) / 100}MB`);
     console.log(`\n🕯️  Memory Server is ready to serve!`);
+    return {
+        total: uniqueMemories.length,
+        core: uniqueMemories.filter(m => m.tier === 'core').length,
+        active: uniqueMemories.filter(m => m.tier === 'active').length,
+    };
 }
 
-main().catch(error => {
-    console.error('❌ Fatal error:', error);
-    process.exit(1);
-});
+// Allow to be called as a module or standalone
+if (require.main === module) {
+    main().catch(error => {
+        console.error('❌ Fatal error:', error);
+        process.exit(1);
+    });
+} else {
+    module.exports = {
+        runIndexing: main
+    };
+}

@@ -1,0 +1,36 @@
+{
+  "messages": [
+    {
+      "id": "3d37fcda-aa12-4e70-a04f-bf1b8ee23aa0",
+      "sender": "user",
+      "text": "ciao, come stai?",
+      "agentName": "User",
+      "timestamp": 1768742482807,
+      "utilityScore": 0
+    },
+    {
+      "id": "63a80dc2-c6f4-4505-baac-1b13ee6a93c4",
+      "sender": "ai",
+      "text": "Si è verificato un errore: Errore API OpenRouter: Provider returned error.",
+      "agentName": "dolfin uncensored",
+      "timestamp": 1768742485174,
+      "utilityScore": 0
+    },
+    {
+      "id": "b062c2ea-5741-45cb-8ec4-77252afbd240",
+      "sender": "user",
+      "text": "ciao come stai?",
+      "agentName": "User",
+      "timestamp": 1768748344435,
+      "utilityScore": 0
+    },
+    {
+      "id": "d5b63231-4831-4547-9885-427900486a5b",
+      "sender": "ai",
+      "text": "Si è verificato un errore: Errore API OpenRouter: Provider returned error.",
+      "agentName": "dolfin uncensored",
+      "timestamp": 1768748351995,
+      "utilityScore": 0
+    }
+  ]
+}

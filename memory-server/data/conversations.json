@@ -1,0 +1,26 @@
+{
+  "conversations": [
+    {
+      "id": "common-room",
+      "name": "Stanza Comune",
+      "type": "common",
+      "participantIds": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "763c844c-d675-46b9-a244-8b6a65d015df",
+        "214cc7e7-ab78-4ee6-9354-cd2160f118cf",
+        "9a18230f-a1db-4767-a689-802885206dd4",
+        "8d5f2d1b-b652-48c7-9078-e39bbca7a165"
+      ],
+      "createdAt": 1765106261806,
+      "updatedAt": 1767448975875,
+      "messageCount": 0,
+      "participantJoinDates": {
+        "9a18230f-a1db-4767-a689-802885206dd4": 1766876022594,
+        "8d5f2d1b-b652-48c7-9078-e39bbca7a165": 1767448975875
+      }
+    }
+  ]
+}
