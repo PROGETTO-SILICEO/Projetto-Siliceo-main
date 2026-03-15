@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>📅 ${date}</span>
                     </div>
                     <div class="jury-content">
-                        "${c.content.substring(0, 300)}${c.content.length > 300 ? '...' : ''}"
+                        "${c.content}"
                     </div>
                     <div class="jury-footer">
                         <div>
