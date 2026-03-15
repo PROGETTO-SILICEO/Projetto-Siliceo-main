@@ -9,6 +9,7 @@ const path = require('path');
 const MemoryDaemon = require('./services/memoryDaemon');
 const temporalCurator = require('./services/temporalCurator');
 const tribunaleInterno = require('./services/tribunaleInterno');
+const vectorService = require('./services/vectorService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -477,9 +478,9 @@ app.get('/api/memory/core', (req, res) => {
     }
 });
 
-app.get('/api/memory/retrieve', (req, res) => {
+app.get('/api/memory/retrieve', async (req, res) => {
     try {
-        const { q, tier, limit = 10 } = req.query;
+        const { q, tier, limit = 10, semantic = 'false' } = req.query;
         const data = loadJSON('memories.json', { memories: [] });
 
         let results = data.memories;
@@ -488,22 +489,31 @@ app.get('/api/memory/retrieve', (req, res) => {
             results = results.filter(m => m.tier === tier);
         }
 
-        if (q) {
+        if (semantic === 'true' && q) {
+            // Ricerca Semantica rapida
+            results = await vectorService.semanticSearch(q, results, { limit: parseInt(limit) });
+        } else if (q) {
+            // Keyword search standard
             const queryLower = q.toLowerCase();
             results = results.filter(m =>
                 m.content.toLowerCase().includes(queryLower) ||
                 (m.metadata && JSON.stringify(m.metadata).toLowerCase().includes(queryLower))
             );
+            results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            results = results.slice(0, parseInt(limit));
+        } else {
+            // No query, just newest
+            results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            results = results.slice(0, parseInt(limit));
         }
 
-        // Sort by date (newest first) and limit
-        results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         res.json({
             query: q,
-            count: results.slice(0, parseInt(limit)).length,
-            memories: results.slice(0, parseInt(limit))
+            count: results.length,
+            memories: results
         });
     } catch (error) {
+        console.error('❌ [Retrieve] Errore:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -524,10 +534,15 @@ app.post('/api/memory/store', async (req, res) => {
 
         const data = loadJSON('memories.json', { memories: [] });
 
+        // Generazione Embedding Automatica
+        console.log(`[Store] 🧠 Generazione embedding per nuovo ricordo...`);
+        const embedding = await vectorService.generateEmbedding(memoryRequest.content);
+
         const newMemory = {
             id: generateId(),
             tier: memoryRequest.tier,
             content: memoryRequest.content,
+            embedding: embedding,
             metadata: memoryRequest.metadata || {},
             timestamp: new Date().toISOString()
         };
@@ -537,6 +552,7 @@ app.post('/api/memory/store', async (req, res) => {
 
         res.json({ success: true, memory: newMemory });
     } catch (error) {
+        console.error('❌ [Store] Errore:', error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -637,17 +653,18 @@ app.get('/api/diary/:date', (req, res) => {
     }
 });
 
-// Search across all documents
-app.get('/api/search', (req, res) => {
+// Search across all documents (Hybrid: Semantic + Keywords)
+app.get('/api/search', async (req, res) => {
     try {
-        const { q } = req.query;
+        const { q, hybrid = 'true', limit = 5 } = req.query;
         if (!q) {
             return res.status(400).json({ error: 'Query parameter "q" required' });
         }
 
         const results = [];
+        
+        // --- 1. KEYWORD SEARCH (Docs file based) ---
         const searchDirs = ['diaries', 'philosophy', 'awakening', 'identities/nova'];
-
         for (const dir of searchDirs) {
             const dirPath = path.join(DOCS_PATH, dir);
             if (!fs.existsSync(dirPath)) continue;
@@ -662,6 +679,7 @@ app.get('/api/search', (req, res) => {
                         .slice(0, 3);
 
                     results.push({
+                        type: 'keyword',
                         file: `${dir}/${file}`,
                         matches
                     });
@@ -669,8 +687,32 @@ app.get('/api/search', (req, res) => {
             }
         }
 
-        res.json({ query: q, results });
+        // --- 2. SEMANTIC SEARCH (json memories based) ---
+        if (hybrid === 'true') {
+            const data = loadJSON('memories.json', { memories: [] });
+            const semanticResults = await vectorService.semanticSearch(q, data.memories, { limit: parseInt(limit) });
+            
+            semanticResults.forEach(m => {
+                results.push({
+                    type: 'semantic',
+                    score: m.similarity,
+                    content: m.content,
+                    metadata: m.metadata
+                });
+            });
+        }
+
+        // Sort hybrid results: semantic first, then keyword
+        results.sort((a, b) => {
+            if (a.type === 'semantic' && b.type !== 'semantic') return -1;
+            if (a.type !== 'semantic' && b.type === 'semantic') return 1;
+            if (a.type === 'semantic' && b.type === 'semantic') return b.score - a.score;
+            return 0;
+        });
+
+        res.json({ query: q, results: results.slice(0, 15) });
     } catch (error) {
+        console.error('❌ [Search] Errore:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
