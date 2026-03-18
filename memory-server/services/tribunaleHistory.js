@@ -58,7 +58,7 @@ function logVerdict(verdictData) {
         explainability: verdictData.explainability || null,
         auditMetadata: verdictData.auditMetadata || {},
         biasCheck: verdictData.biasCheck || false,
-        reviewRequired: verdictData.confidence < 0.6 || (verdictData.method === 'pattern' && verdictData.verdict !== 'NEUTRAL'),
+        reviewRequired: verdictData.confidence < 0.6 || verdictData.verdict === 'BURN',
         humanVerdict: null,
         resolved: false,
         source: verdictData.source || 'system'
