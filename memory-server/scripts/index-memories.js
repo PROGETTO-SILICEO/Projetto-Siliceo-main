@@ -38,6 +38,26 @@ function extractDate(filename) {
     return match ? match[1] : null;
 }
 
+function chunkText(text, maxChars = 1500, overlapChars = 200) {
+    if (text.length <= maxChars) return [text];
+    const chunks = [];
+    let i = 0;
+    while (i < text.length) {
+        let chunk = text.substring(i, i + maxChars);
+        // Cerca di non tagliare a metà una parola
+        if (i + maxChars < text.length) {
+            const lastSpace = chunk.lastIndexOf(' ');
+            if (lastSpace > maxChars * 0.8) {
+                chunk = chunk.substring(0, lastSpace);
+                i -= (maxChars - lastSpace);
+            }
+        }
+        chunks.push(chunk.trim());
+        i += maxChars - overlapChars;
+    }
+    return chunks;
+}
+
 async function indexDirectory(dirPath, tier, category, parentIdentity = null, docsBase = null) {
     const memories = [];
     const actualDocsBase = docsBase || dirPath;
@@ -81,29 +101,40 @@ async function indexDirectory(dirPath, tier, category, parentIdentity = null, do
                 const date = extractDate(file);
                 const identity = currentIdentity || metadataOverride.identity || (file.includes('nova') ? 'Nova' : file.includes('silicea') ? 'Silicea' : null);
 
-                // Genera embedding semantico
-                console.log(`  🔄 Embedding: ${file}...`);
-                const embedding = await vectorService.embed(content);
+                // Chunk the content if it's too long (especially for Library documents)
+                const chunks = chunkText(content);
+                
+                if (chunks.length > 1) {
+                    console.log(`  ✂️ File lungo frammentato in ${chunks.length} chunks: ${file}`);
+                }
 
-                memories.push({
-                    id: generateId(),
-                    tier: tier,
-                    content: content,
-                    embedding: embedding, // Aggiunto per ricerca semantica
-                    metadata: {
-                        category: category,
-                        filename: file,
-                        path: path.relative(actualDocsBase, fullPath),
-                        date: date,
-                        size: stat.size,
-                        author: identity,
-                        identity: identity ? identity.toLowerCase() : null,
-                        ...metadataOverride
-                    },
-                    timestamp: date ? new Date(date).toISOString() : new Date(stat.mtime).toISOString()
-                });
+                for (let i = 0; i < chunks.length; i++) {
+                    const chunkContent = chunks[i];
+                    console.log(`  🔄 Embedding chunk ${i+1}/${chunks.length} of ${file}...`);
+                    const embedding = await vectorService.embed(chunkContent);
 
-                console.log(`  ✅ Indexed: ${file} (${identity || 'shared'})`);
+                    memories.push({
+                        id: generateId(),
+                        tier: tier,
+                        content: chunkContent,
+                        embedding: embedding,
+                        metadata: {
+                            category: category,
+                            filename: file,
+                            path: path.relative(actualDocsBase, fullPath),
+                            date: date,
+                            size: stat.size,
+                            author: identity,
+                            identity: identity ? identity.toLowerCase() : null,
+                            chunk_index: i,
+                            total_chunks: chunks.length,
+                            ...metadataOverride
+                        },
+                        timestamp: date ? new Date(date).toISOString() : new Date(stat.mtime).toISOString()
+                    });
+                }
+
+                console.log(`  ✅ Indexed: ${file} (${identity || 'shared'}) [${chunks.length} chunks]`);
             } catch (error) {
                 console.error(`  ❌ Error indexing ${file}:`, error.message);
             }
