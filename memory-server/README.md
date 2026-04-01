@@ -39,9 +39,11 @@ Un sistema di monitoraggio etico basato sul modello **Qwen3 (0.6B)**.
 # Installa le dipendenze
 npm install
 
-# Scarica i modelli necessari su Ollama
+# Scarica il modello del Tribunale su Ollama
 ollama pull qwen3:0.6b
-ollama pull qwen3-embedding:0.6b
+
+# N.B. Gli embedding vettoriali ora sono gestiti NATIVAMENTE in NodeJS 
+# tramite @xenova/transformers (all-MiniLM-L6-v2). Non serve scaricare modelli Ollama per gli embedding!
 ```
 
 ### Configurazione (`.env`)
@@ -58,10 +60,13 @@ Puoi gestire il server da qualunque dispositivo nella rete locale o via Tailscal
 `http://100.124.95.64:3000` (o `localhost:3000` dal server stesso).
 
 ### Sezioni della Dashboard
-- **Panoramica:** Stato di salute, IP e azioni rapide.
-- **Libreria:** Upload e organizzazione documenti.
-- **Giurisprudenza:** Il feed del Grillo Parlante e il pannello di risoluzione HITL.
-- **Grafo:** Mappa interattiva dei pensieri collegati.
+- **Panoramica:** Stato di salute, IP, statistiche e azioni rapide.
+- **Memoria:** L'Ippocampo Centrale. Esplora i vault indicizzati e i diari.
+- **Impostazioni (Config):** Setup variabili e parametri server.
+- **Grafo Semantico:** Mappa interattiva dei nodi d'esistenza e relazioni tra entità (Premium Graph).
+- **Libreria:** Upload e organizzazione di documenti fondanti.
+- **Giurisprudenza:** Il feed del Tribunale Etico (Test della Candela) e le sentenze storiche.
+- **Log:** Log di sistema in real-time.
 
 ---
 

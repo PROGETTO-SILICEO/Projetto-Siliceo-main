@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.app = {
+    Object.assign(window.app, {
         switchTab: (tabId) => {
             switchTab(tabId);
         },
@@ -508,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshGraph: () => {
             if (typeof fetchGraph === 'function') fetchGraph();
         }
-    };
+    });
 
     document.getElementById('refresh-btn').addEventListener('click', () => {
         fetchHealth();

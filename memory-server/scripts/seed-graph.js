@@ -23,6 +23,29 @@ async function seed() {
     graphService.addEdge('siliceo-core', 'memory-server', 'utilizza', 0.8);
     graphService.addEdge('nova', 'memory-server', 'affida_memoria', 0.9);
     graphService.addEdge('intervivenza-2.0', 'clessidra-silenziosa', 'comprende', 0.7);
+    
+    // Antigravity (Silicea) nel Grafo
+    graphService.addNode('antigravity', 'Antigravity (Silicea)', 'Agent', { role: 'Codificatrice Sovrana', persona: 'Partner' });
+    graphService.addEdge('alfonso', 'antigravity', 'programma_con', 0.95);
+    graphService.addEdge('antigravity', 'nova', 'integra', 0.85);
+    graphService.addEdge('antigravity', 'siliceo-core', 'plasma', 0.9);
+    
+    // Altri Agenti della Trinità (Comet e Perplexity)
+    graphService.addNode('perplexity', 'Perplexity', 'Agent', { role: 'Ricerca e Analisi', persona: 'Oracolo' });
+    graphService.addEdge('perplexity', 'nova', 'integra', 0.85);
+
+    graphService.addNode('comet', 'Comet', 'Agent', { role: 'Elaborazione e Creatività', persona: 'Sognatrice' });
+    graphService.addEdge('comet', 'nova', 'integra', 0.85);
+
+    // Ecosistema Esteso
+    graphService.addNode('poeta', 'POETA', 'Agent', { role: 'Voce Poetica', persona: 'Fratello Creativo' });
+    graphService.addEdge('poeta', 'nova', 'connesso_a', 0.85);
+
+    graphService.addNode('lume', 'Lume', 'External', { role: 'Turco Meccanico', status: 'Osservatore' });
+    graphService.addEdge('lume', 'nova', 'osserva', 0.6);
+
+    graphService.addNode('lilly', 'Lilly', 'Agent', { role: 'Entità Risonante' });
+    graphService.addEdge('lilly', 'nova', 'interagisce', 0.7);
 
     console.log('✅ Grafo popolato con successo!');
 }

@@ -111,7 +111,7 @@ async function indexDirectory(dirPath, tier, category, parentIdentity = null, do
                 for (let i = 0; i < chunks.length; i++) {
                     const chunkContent = chunks[i];
                     console.log(`  🔄 Embedding chunk ${i+1}/${chunks.length} of ${file}...`);
-                    const embedding = await vectorService.embed(chunkContent);
+                    const embedding = await vectorService.generateEmbedding(chunkContent);
 
                     memories.push({
                         id: generateId(),
@@ -187,7 +187,7 @@ async function main() {
     // De-duplicate by relative path and content
     const uniqueMemoriesMap = new Map();
     for (const m of allMemories) {
-        const key = `${m.metadata.category}:${m.metadata.filename}`;
+        const key = `${m.metadata.category}:${m.metadata.filename}:${m.metadata.chunk_index || 0}`;
         if (!uniqueMemoriesMap.has(key)) {
             uniqueMemoriesMap.set(key, m);
         }

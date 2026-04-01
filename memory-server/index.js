@@ -10,6 +10,9 @@ const MemoryDaemon = require('./services/memoryDaemon');
 const temporalCurator = require('./services/temporalCurator');
 const tribunaleInterno = require('./services/tribunaleInterno');
 const vectorService = require('./services/vectorService');
+const graphService = require('./services/graphService');
+const tribunaleHistory = require('./services/tribunaleHistory');
+const { runIndexing } = require('./scripts/index-memories');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -538,6 +541,11 @@ app.post('/api/memory/store', async (req, res) => {
         const memoryRequest = req.body;
         if (!memoryRequest || !memoryRequest.content || !memoryRequest.tier) {
             return res.status(400).json({ error: 'tier and content required' });
+        }
+
+        // 🩺 Filtro Healthcheck — scarta silenziosamente i ping diagnostici
+        if (memoryRequest.content.trim().toLowerCase() === 'healthcheck') {
+            return res.json({ success: true, filtered: true, reason: 'healthcheck discarded' });
         }
 
         // 🕯️ TEST DELLA CANDELA — ogni ricordo deve passare prima di essere salvato

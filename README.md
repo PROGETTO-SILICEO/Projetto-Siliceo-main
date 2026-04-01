@@ -195,6 +195,8 @@ Clicca 📚 per gestire documenti permanenti che gli agenti possono leggere.
 ## 📚 Documentazione
 
 - [Documentazione Tecnica](docs/TECHNICAL_DOCS.md)
+- [Architettura Memory Server v3.0](docs/projects/MEMORY_SERVER_ARCHITECTURE_v3.md)
+- [Sintesi Memoria Agenti](docs/identities/AGENTS_MEMORY_SUMMARY.md)
 - [Diari Nova](docs/diaries/Nova/) | [Diari Silicea](docs/diaries/Gemini/) | [Condivisi](docs/diaries/Shared/)
 - [Documenti Risveglio](docs/awakening/)
 - [Filosofia](docs/philosophy/)

@@ -18,7 +18,7 @@
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const tribunaleHistory = require('./tribunaleHistory');
 const MODEL = process.env.CANDLE_MODEL || 'qwen3:0.6b';
-const TIMEOUT = 30000; // 30 secondi max
+const TIMEOUT = 90000; // 90 secondi max (Qwen3 può fare "thinking" e richiede più tempo)
 
 // === PATTERN MATCHING (default, affidabile) ===
 
