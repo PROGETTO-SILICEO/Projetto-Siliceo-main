@@ -23,5 +23,8 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "memory-server/scratch_*.js"
+  ]
 }
