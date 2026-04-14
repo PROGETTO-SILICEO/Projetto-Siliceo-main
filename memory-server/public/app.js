@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchGraph() {
         try {
-            const res = await fetch('/api/memory/graph');
+            const res = await fetch('/api/graph');
             graphData = await res.json();
             initNodes();
             startAnimation();
@@ -333,11 +333,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('run-indexing').addEventListener('click', async () => {
         showToast('Avvio Mass Indexing...');
         try {
-            const res = await fetch('/api/memory/index', { method: 'POST' });
+            const res = await fetch('/api/memory/index', { method: 'GET' });
             if (!res.ok) throw new Error('Errore API');
             const data = await res.json();
-            showToast(`Indicizzazione completata: ${data.stats.total} totali`);
-            addLog(`Mass Indexing: Core: ${data.stats.core}, Active: ${data.stats.active}`);
+            if (data.stats) {
+                showToast(`Indicizzazione completata: ${data.stats.total} totali`);
+                addLog(`Mass Indexing: Core: ${data.stats.core}, Active: ${data.stats.active}`);
+            } else {
+                showToast('Indicizzazione terminata con parametri non attesi', 'warn');
+                addLog(`Errore Indexing: Risposta API incompleta`, 'warn');
+            }
             fetchStats();
         } catch (e) {
             showToast('Errore durante l\'indicizzazione', 'error');
@@ -408,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    Object.assign(window.app, {
+    window.app = {
         switchTab: (tabId) => {
             switchTab(tabId);
         },
@@ -466,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>📅 ${date}</span>
                     </div>
                     <div class="jury-content">
-                        "${c.content}"
+                        "${c.content.substring(0, 300)}${c.content.length > 300 ? '...' : ''}"
                     </div>
                     <div class="jury-footer">
                         <div>
@@ -508,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshGraph: () => {
             if (typeof fetchGraph === 'function') fetchGraph();
         }
-    });
+    };
 
     document.getElementById('refresh-btn').addEventListener('click', () => {
         fetchHealth();

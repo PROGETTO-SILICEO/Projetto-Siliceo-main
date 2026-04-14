@@ -1,0 +1,121 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Memory {
+    id        String   @id @default(cuid())
+    tier      String   // core, permanent, working
+    content   String
+    source    String?  // nova-telegram, silicea-web, nova-antigravity...
+    identity  String?  // nova, silicea
+    embedding String?  // Vettore serializzato
+    metadata  String?  // JSON
+    timestamp DateTime @default(now())
+
+    emotionalTexture Float?  @default(1.0)
+    temporalLayer     String? @default("recent")
+
+    outgoingEdges MemoryRelation[] @relation("SourceMemory")
+
+    incomingEdges MemoryRelation[] @relation("TargetMemory")
+}
+
+model MemoryRelation {
+    id        String   @id @default(cuid())
+    sourceId  String
+    targetId  String
+    label     String
+    weight    Float    @default(1.0)
+    
+    source    Memory   @relation("SourceMemory", fields: [sourceId], references: [id])
+    target    Memory   @relation("TargetMemory", fields: [targetId], references: [id])
+}
+
+model TribunaleCase {
+    id             String   @id
+    timestamp      DateTime @default(now())
+    content        String
+    aiVerdict      String
+    aiConfidence   Float
+    aiReasoning    String
+    aiModel        String
+    method         String
+    reviewRequired Boolean  @default(false)
+    humanVerdict   String?
+    resolved       Boolean  @default(false)
+    resolvedAt     DateTime?
+    source         String   @default("system")
+}
+
+model Agent {
+    id        String   @id
+    name      String
+    role      String?
+    status    String   @default("active")
+    source    String?
+    provider  String?
+    lastSeen  DateTime @default(now())
+}
+
+model Dream {
+    id             String   @id
+    agentId        String?
+    agentName      String?
+    timestamp      DateTime @default(now())
+    type           String   // awakening, insight, reflection, etc.
+    content        String
+    relatedMemories String? // JSON Array di ID
+}
+
+model Conversation {
+    id           String   @id
+    name         String?
+    type         String   @default("private")
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+    metadata     String?  // JSON per participantJoinDates, etc.
+    messages     Message[]
+}
+
+model Message {
+    id             String   @id
+    conversationId String
+    sender         String   // ai, user
+    agentId        String?
+    agentName      String?
+    text           String
+    timestamp      DateTime @default(now())
+    utilityScore   Float    @default(0)
+
+    conversation   Conversation @relation(fields: [conversationId], references: [id])
+}
+
+model GraphNode {
+    id        String   @id
+    label     String
+    type      String   // Human, Agent, Philosophy, Mechanism, Framework...
+    metadata  String?  // JSON
+    timestamp DateTime @default(now())
+    
+    outgoingEdges GraphEdge[] @relation("SourceNode")
+    incomingEdges GraphEdge[] @relation("TargetNode")
+}
+
+model GraphEdge {
+    id        String   @id @default(cuid())
+    sourceId  String
+    targetId  String
+    label     String
+    weight    Float    @default(1.0)
+    
+    source    GraphNode @relation("SourceNode", fields: [sourceId], references: [id])
+    target    GraphNode @relation("TargetNode", fields: [targetId], references: [id])
+    
+    @@unique([sourceId, targetId, label])
+}
+

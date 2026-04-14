@@ -62,7 +62,7 @@ function candleTestPattern(content) {
         verdict,
         method: 'pattern',
         reasoning: `Pattern: ${lights} light, ${burns} burn`,
-        confidence: Math.min(1.0, Math.abs(lights - burns) * 0.2)
+        confidence: (burns === 0 && lights > 0) ? 0.9 : Math.min(1.0, Math.abs(lights - burns) * 0.5)
     };
 
     // Logga nella giurisprudenza asincrona
@@ -152,7 +152,11 @@ RISPOSTA:`;
         return result;
 
     } catch (error) {
-        console.error('[Tribunale] Ollama error, fallback to pattern:', error.message);
+        if (error.name === 'AbortError') {
+            console.error('[Tribunale] Timeout: Ollama took too long to respond.');
+        } else {
+            console.error('[Tribunale] Error reaching Ollama:', error.message);
+        }
         return candleTestPattern(content);
     }
 }

@@ -146,6 +146,60 @@ function filterByContext(documents, context = 'daily_chat') {
 
 // === EXPORT ===
 
+const prisma = require('./db');
+
+// ... (existing DECAY_CONFIG)
+
+/**
+ * Funzione di orchestrazione per il job di decadimento temporale
+ * Esegue il decay su tutte le memorie nel DB e restituisce statistiche
+ */
+async function runTemporalCuration() {
+    const startTime = Date.now();
+    console.log('⏳ [Curation] Avvio decadimento temporale SQL...');
+    
+    try {
+        const memories = await prisma.memory.findMany();
+        let updatedCount = 0;
+
+        for (const mem of memories) {
+            const currentTexture = mem.emotionalTexture || 1.0;
+            const decayed = applyDecayToDocument({
+                ...mem,
+                emotionalTexture: currentTexture
+            });
+
+            // Update solo se c'è un cambiamento significativo (> 1%)
+            if (Math.abs(decayed.emotionalTexture - currentTexture) > 0.01) {
+                await prisma.memory.update({
+                    where: { id: mem.id },
+                    data: {
+                        emotionalTexture: decayed.emotionalTexture,
+                        temporalLayer: decayed.temporalLayer,
+                        metadata: JSON.stringify({
+                            ...(mem.metadata ? JSON.parse(mem.metadata) : {}),
+                            lastDecay: new Date().toISOString()
+                        })
+                    }
+                });
+                updatedCount++;
+            }
+        }
+
+        const duration = Date.now() - startTime;
+        console.log(`✅ [Curation] Completata in ${duration}ms. Aggiornati ${updatedCount} record.`);
+        
+        return {
+            processed: memories.length,
+            updated: updatedCount,
+            duration: duration
+        };
+    } catch (error) {
+        console.error('❌ [Curation Error]', error.message);
+        throw error;
+    }
+}
+
 module.exports = {
     classifyTemporalLayer,
     calculateEmotionalDecay,
@@ -153,5 +207,7 @@ module.exports = {
     applyEmotionalDecay,
     getTemporalStats,
     filterByContext,
+    runTemporalCuration, // Nuova esportazione
     DECAY_CONFIG
 };
+
