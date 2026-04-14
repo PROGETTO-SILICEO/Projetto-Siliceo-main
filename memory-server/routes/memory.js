@@ -7,6 +7,76 @@ const tribunaleInterno = require('../services/tribunaleInterno');
 const graphDiscovery = require('../services/graphDiscovery');
 const { runIndexing } = require('../scripts/index-memories');
 
+function parseMemoryRecord(memory) {
+    let embedding = null;
+    let metadata = {};
+
+    try {
+        embedding = memory.embedding ? JSON.parse(memory.embedding) : null;
+    } catch (e) {
+        embedding = null;
+    }
+
+    try {
+        metadata = memory.metadata ? JSON.parse(memory.metadata) : {};
+    } catch (e) {
+        metadata = {};
+    }
+
+    return {
+        ...memory,
+        embedding,
+        metadata
+    };
+}
+
+// 0. RETRIEVE (Legacy-compatible retrieval endpoint)
+router.get('/retrieve', async (req, res) => {
+    try {
+        const { q, tier, identity, semantic = 'false' } = req.query;
+        const limit = Math.max(1, parseInt(req.query.limit, 10) || 10);
+
+        const where = {};
+        if (tier) where.tier = tier;
+
+        if (identity) {
+            where.OR = [
+                { identity: { contains: identity } },
+                { source: { contains: identity } },
+                { metadata: { contains: identity } }
+            ];
+        }
+
+        if (q && semantic !== 'true') {
+            where.content = { contains: q };
+        }
+
+        const memories = await prisma.memory.findMany({
+            where,
+            orderBy: { timestamp: 'desc' },
+            take: semantic === 'true' ? limit * 10 : limit
+        });
+
+        let formatted = memories.map(parseMemoryRecord);
+
+        if (semantic === 'true' && q) {
+            formatted = await vectorService.semanticSearch(q, formatted, {
+                limit,
+                tier: tier || null,
+                identity: identity || null
+            });
+        }
+
+        res.json({
+            query: q || null,
+            count: formatted.length,
+            memories: formatted.slice(0, limit)
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 1. SEARCH (Semantic RAG)
 router.post('/search', async (req, res) => {
     try {
