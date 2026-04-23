@@ -33,7 +33,7 @@ function parseMemoryRecord(memory) {
 // 0. RETRIEVE (Legacy-compatible retrieval endpoint)
 router.get('/retrieve', async (req, res) => {
     try {
-        const { q, tier, identity, semantic = 'false' } = req.query;
+        const { q, tier, identity, semantic = 'false', recent = 'false' } = req.query;
         const limit = Math.max(1, parseInt(req.query.limit, 10) || 10);
 
         const where = {};
@@ -45,6 +45,20 @@ router.get('/retrieve', async (req, res) => {
                 { source: { contains: identity } },
                 { metadata: { contains: identity } }
             ];
+        }
+
+        // Se recent è true, ignoriamo la ricerca testuale e prendiamo gli ultimi record
+        if (recent === 'true') {
+            const memories = await prisma.memory.findMany({
+                where,
+                orderBy: { timestamp: 'desc' },
+                take: limit
+            });
+            return res.json({
+                query: 'recent_history',
+                count: memories.length,
+                memories: memories.map(parseMemoryRecord)
+            });
         }
 
         if (q && semantic !== 'true') {
@@ -271,6 +285,27 @@ router.post('/tribunale/resolve', async (req, res) => {
         }
 
         res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 8. TRIBUNALE EVALUATE — valuta senza salvare (per sogni e contenuti pre-salvataggio)
+// Usato dal daemon Python per ottenere un verdetto PRIMA di salvare il sogno
+router.post('/tribunale/evaluate', async (req, res) => {
+    try {
+        const { content, tier = 'working', useLLM = false } = req.body;
+        if (!content) return res.status(400).json({ error: 'content required' });
+
+        const result = await tribunaleInterno.candleTest(content, useLLM);
+
+        res.json({
+            verdict: result.verdict,      // LIGHT | NEUTRAL | BURN
+            method: result.method,        // pattern | llm
+            reasoning: result.reasoning,
+            confidence: result.confidence,
+            shouldSave: result.verdict !== 'BURN'
+        });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
