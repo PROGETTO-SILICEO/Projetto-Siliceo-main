@@ -88,7 +88,7 @@ async function semanticSearch(query, documents, options = {}) {
     // Filtra e calcola score
     const results = documents
         .filter(doc => {
-            if (identity && doc.metadata?.identity !== identity.toLowerCase()) return false;
+            if (identity && doc.identity?.toLowerCase() !== identity.toLowerCase()) return false;
             if (tier && doc.tier !== tier) return false;
             return !!doc.embedding;
         })
